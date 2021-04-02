@@ -30,7 +30,7 @@ volatile int Stunde = 0;
 volatile int Minute = 0;
 volatile int Sekunde = 0;
 //Zweistellige Zahlen sollten in Einer und Zehner zerlegt werden, damit sie auf dem LCD korrekt angezeigt werden
-//Immer, wenn nicht Stunde, Minute oder Sekunde einen neuen Wert bekommt machen (Nicht bevor es ans LCD gesendet wird)
+//Immer, wenn Stunde, Minute oder Sekunde an LCD gesendet werde muss man sie in Zehner und Einer zerlegen
 volatile int SekundeE = Sekunde % 10;
 volatile int SekundeZ = Sekunde / 10 % 10;
 volatile int MinuteE = Minute % 10;
@@ -68,8 +68,22 @@ volatile int SchlafenFlag = 0;
 //Wenn FunkuhrModus == 1, dann Funkuhr; Wenn FunkuhrModus == 0 autonome Uhr
 volatile int FunkuhrModus = 1;
 
-//Wenn ManuelleUhrzeit == 1 befindet man sich im Modus, in dem man die Uhrzeit manuell einstellen kann
+//Wenn ManuelEinstellen == 1 befindet man sich im Modus, in dem man die Uhrzeit manuell einstellen kann
 volatile int ManuelEinstellen = 0;
+volatile int StundeEinstellen = 0;
+volatile int MinuteEinstellen = 0;
+volatile int SekundeEinstllen = 0;
+
+//Knopf Flag wird in einem Interrupt gesetzt, der jedes mal ausgeführt wird, wenn ein Knopf gedrückt wird.
+//Das soll dazu führen, dass wenig Latenz beim drücken der wert sich nur um 1 verändert und, dass das drücken der Knöpfe, wenn man die Uhrzeit manuel einstellt nicht viel Latenz hat
+//Die ISR, in dem dieser Flag gesetzt wird muss noch eingerichtet werden (auf Steigende Flanke setzen)
+volatile int KnopfFlag = 0;
+
+//Knöpfe, die ich noch hinzufügen möchte:
+//aktivieren/Beenden der Funkuhr; Wenn im Manuell einstellen: Wechsel zwischen Stunde, Minute, Sekunde
+//Manuelles Einstellen starten/beenden
+//++
+//--
 
 
 
@@ -81,8 +95,12 @@ volatile int ManuelEinstellen = 0;
 void UhrzeitAnLCDSenden () {
 
   
-  //SekundeE = Sekunde % 10;
-  //SekundeZ = Sekunde / 10 % 10;
+  SekundeE = Sekunde % 10;
+  SekundeZ = Sekunde / 10 % 10;
+  MinuteE = Minute % 10;
+  MinuteZ = Minute / 10 % 10;
+  StundeE = Stunde % 10;
+  StundeZ = Stunde / 10 % 10;
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -300,11 +318,15 @@ void loop() {
 
   //Wenn die Uhr im Funkuhr Modus ist zähle ich unabhängig von der Antenne die Sekunden mit
   //TCNT1 wird 1 mal in der Minute mit dem Funksignal synchronisiert
-  
   if (FunkuhrModus == 1 && Timer1Flag == 1){
       Timer1Flag = 0;
-
-      SekundeVergangen();
+      
+      if (Sekunde < 59) {
+        Sekunde++;
+      }
+      else {
+        Sekunde = 0;
+      }
       SekundeE = Sekunde % 10;
       SekundeZ = Sekunde / 10 % 10;
       
@@ -312,7 +334,6 @@ void loop() {
       UhrzeitAnLCDSenden ();
       }
   }
-  
 
   
   //Wenn die Uhr im FunkuhrModus ist, befindet sie sich in Diesem Loop
@@ -320,19 +341,21 @@ void loop() {
   if (DCF77PinFlag == 1 && FunkuhrModus == 1) {
     DCF77PinFlag = 0;
     DCF77Signal = digitalRead(2);
+    Serial.print("Pin 2: ");
+    Serial.println(DCF77Signal);
 
     //Pin2: Low->High
     //Soll nur dazu dienen, um DauerLow korrekt zu messen
     if (DCF77Signal == 1) {
       ZeitpunktUp = millis();
-      //Serial.print("ZeitpunktUp: ");
-      //Serial.println(ZeitpunktUp);
+      Serial.print("ZeitpunktUp: ");
+      Serial.println(ZeitpunktUp);
       DauerLow = ZeitpunktUp - ZeitpunktDown;
     }
     else {
       ZeitpunktDown = millis();
-      //Serial.print("ZeitpunktDown: ");
-      //Serial.println(ZeitpunktDown);
+      Serial.print("ZeitpunktDown: ");
+      Serial.println(ZeitpunktDown);
       DauerHigh = ZeitpunktDown - ZeitpunktUp;
     }
 
@@ -361,7 +384,7 @@ void loop() {
     DCF77Bitnummer++;
     }
     if (DCF77Bitnummer == 59){
-      Serial.println("DCF77Bitnummer = 59!");
+      Serial.println("DCF77Bitnummer = 60!");
       DCF77Bitnummer = 0;
       DCF77FertigKalibriert = 1;     
     }
@@ -381,14 +404,13 @@ void loop() {
       Serial.println("DCF77Bitnummer = 0");
       
       Sekunde = 0;
-      TCNT1 = 0;
+      TCNT1 = 3036;
       
       MinuteE = Minute % 10;
       MinuteZ = Minute / 10 % 10;
       StundeE = Stunde % 10;
       StundeZ = Stunde / 10 % 10;
-      UhrzeitAnLCDSenden ();
-      }
+    }
   }
 
 
@@ -400,5 +422,17 @@ void loop() {
   }
 
   //Wenn man die Uhrzeit an der Uhr manuell einstellen möchte
+  if (FunkuhrModus == 0 && ManuelEinstellen == 1){
+    if (StundeEinstellen == 1 && KnopfFlag == 1) {
+      UhrzeitAnLCDSenden ();
+      lcd.setCursor(0, 1);
+      lcd.print ("XX:--:--");
+    }
+    if (MinuteEinstellen == 1 && KnopfFlag == 1) {
+      UhrzeitAnLCDSenden ();
+      lcd.setCursor(0, 1);
+      lcd.print ("--:XX:--");
+    }
+  }
   
 }
