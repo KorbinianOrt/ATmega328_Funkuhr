@@ -1,7 +1,7 @@
 //Diese Uhr benutzt den internen 16 Bit Timer
 //Es gibt eine Option, mit der man die Uhr manuell stellen kann
 
-//Es gibt eine Option, mit der man die Uhr mit einem Funktignal stellen kann.
+//Es gibt eine Option, mit der man die Uhr mit einem Funksignal stellen kann.
 //siehe https://de.wikipedia.org/wiki/DCF77#Amplitudenumtastung
 
 
