@@ -24,36 +24,29 @@ LiquidCrystal lcd(13, 12, 4, 5, 6, 7);
 
 
 //in diesen Variablen wird die Uhrzeit mitgezählt
-volatile int Counter = 1;
-volatile int Tag = 0;
-volatile int Stunde = 0;
-volatile int Minute = 0;
-volatile int Sekunde = 0;
-//Zweistellige Zahlen sollten in Einer und Zehner zerlegt werden, damit sie auf dem LCD korrekt angezeigt werden
-//Immer, wenn Stunde, Minute oder Sekunde an LCD gesendet werde muss man sie in Zehner und Einer zerlegen
-volatile int SekundeE = Sekunde % 10;
-volatile int SekundeZ = Sekunde / 10 % 10;
-volatile int MinuteE = Minute % 10;
-volatile int MinuteZ = Minute / 10 % 10;
-volatile int StundeE = Stunde % 10;
-volatile int StundeZ = Stunde / 10 % 10;
+int Counter = 1;
+int Tag = 0;
+int Stunde = 0;
+int Minute = 0;
+int Sekunde = 0;
+
 
 //Variablen, um die Das DCF77 Signales zu interpretieren
 //Zeitpunkt, an dem von HIGH auf LOW gewechselt wird
-volatile int ZeitpunktDown = 0;
+int ZeitpunktDown = 0;
 //Zeitpunkt, an dem von LOW auf HIGH gewechselt wird
-volatile int ZeitpunktUp = 0;
+int ZeitpunktUp = 0;
 //Dauer, wie lange das auf Signal LOW war
-volatile int DauerLow = 0;
+int DauerLow = 0;
 //Dauer, wie lange das Signal auf HIGH war
-volatile int DauerHigh = 0;
+int DauerHigh = 0;
 //Es muss mitgezählt werden welcher Bit HIGH oder LOW war
-volatile int DCF77Signal = 0;
-volatile int DCF77Bitnummer = 0;
+int DCF77Signal = 0;
+int DCF77Bitnummer = 0;
 //DCF77Bitnummer initialisieren ist dafür da, dass erst ab dem tatsächlich ersten Bit des DCF77 mitgezählt wird. (damit das Signal nicht falsch interpretiert werden kann)
-volatile int DCF77BitnummerZaehlen = 0;
-volatile int DCF77Bitwert = 0;
-volatile int DCF77FertigKalibriert = 0;
+int DCF77BitnummerZaehlen = 0;
+int DCF77Bitwert = 0;
+int DCF77FertigKalibriert = 0;
 
 //Wenn sich Pin2 ändert wird ein Flag gesetzt
 volatile int DCF77PinFlag = 0;
@@ -66,13 +59,13 @@ volatile int SchlafenFlag = 0;
 //Schlafen ignoriere ich vorerst. Es wird dann eingebaut, wenn die Uhr praktisch funktioniert
 
 //Wenn FunkuhrModus == 1, dann Funkuhr; Wenn FunkuhrModus == 0 autonome Uhr
-volatile int FunkuhrModus = 1;
+int FunkuhrModus = 1;
 
 //Wenn ManuelEinstellen == 1 befindet man sich im Modus, in dem man die Uhrzeit manuell einstellen kann
-volatile int ManuelEinstellen = 0;
-volatile int StundeEinstellen = 0;
-volatile int MinuteEinstellen = 0;
-volatile int SekundeEinstllen = 0;
+int ManuelEinstellen = 0;
+int StundeEinstellen = 0;
+int MinuteEinstellen = 0;
+int SekundeEinstellen = 0;
 
 //Knopf Flag wird in einem Interrupt gesetzt, der jedes mal ausgeführt wird, wenn ein Knopf gedrückt wird.
 //Das soll dazu führen, dass wenig Latenz beim drücken der wert sich nur um 1 verändert und, dass das drücken der Knöpfe, wenn man die Uhrzeit manuel einstellt nicht viel Latenz hat
@@ -92,16 +85,16 @@ volatile int KnopfFlag = 0;
 
 
 
-void UhrzeitAnLCDSenden () {
+void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
 
+  //Damit die Uhrzeit am LCD korrekt angezeigt wird muss man 
+  int SekundeE = SekundeLCD % 10;
+  int SekundeZ = SekundeLCD / 10 % 10;
+  int MinuteE = MinuteLCD % 10;
+  int MinuteZ = MinuteLCD / 10 % 10;
+  int StundeE = StundeLCD % 10;
+  int StundeZ = StundeLCD / 10 % 10;
   
-  SekundeE = Sekunde % 10;
-  SekundeZ = Sekunde / 10 % 10;
-  MinuteE = Minute % 10;
-  MinuteZ = Minute / 10 % 10;
-  StundeE = Stunde % 10;
-  StundeZ = Stunde / 10 % 10;
-
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(StundeZ);
@@ -113,28 +106,22 @@ void UhrzeitAnLCDSenden () {
   lcd.print(SekundeZ);
   lcd.print(SekundeE);
 }
-
-
+  
+  
 void SekundeVergangen () {
   if (Sekunde < 59) {
     Sekunde++;
-    SekundeE = Sekunde % 10;
-    SekundeZ = Sekunde / 10 % 10;
   }
   else {
     Sekunde = 0;
     if (Minute < 59) {
       Minute++;
-      MinuteE = Minute % 10;
-      MinuteZ = Minute / 10 % 10;
     }
     else {
       Sekunde = 0;
       Minute = 0;
       if (Stunde < 23) {
         Stunde++;
-        StundeE = Stunde % 10;
-        StundeZ = Stunde / 10 % 10;
       }
     }
   }
@@ -327,11 +314,10 @@ void loop() {
       else {
         Sekunde = 0;
       }
-      SekundeE = Sekunde % 10;
-      SekundeZ = Sekunde / 10 % 10;
+
       
       if (DCF77FertigKalibriert == 1){
-      UhrzeitAnLCDSenden ();
+      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
       }
   }
 
@@ -384,7 +370,7 @@ void loop() {
     DCF77Bitnummer++;
     }
     if (DCF77Bitnummer == 59){
-      Serial.println("DCF77Bitnummer = 60!");
+      Serial.println("DCF77Bitnummer = 59!");
       DCF77Bitnummer = 0;
       DCF77FertigKalibriert = 1;     
     }
@@ -406,10 +392,7 @@ void loop() {
       Sekunde = 0;
       TCNT1 = 3036;
       
-      MinuteE = Minute % 10;
-      MinuteZ = Minute / 10 % 10;
-      StundeE = Stunde % 10;
-      StundeZ = Stunde / 10 % 10;
+
     }
   }
 
@@ -417,19 +400,19 @@ void loop() {
   if (FunkuhrModus == 0 && Timer1Flag == 1){
     Timer1Flag = 0;
     SekundeVergangen ();
-    UhrzeitAnLCDSenden ();
+    UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
     
   }
 
   //Wenn man die Uhrzeit an der Uhr manuell einstellen möchte
   if (FunkuhrModus == 0 && ManuelEinstellen == 1){
     if (StundeEinstellen == 1 && KnopfFlag == 1) {
-      UhrzeitAnLCDSenden ();
+      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
       lcd.setCursor(0, 1);
       lcd.print ("XX:--:--");
     }
     if (MinuteEinstellen == 1 && KnopfFlag == 1) {
-      UhrzeitAnLCDSenden ();
+      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
       lcd.setCursor(0, 1);
       lcd.print ("--:XX:--");
     }
