@@ -84,6 +84,31 @@ bool SekundeEinstellen = false;
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Alle Funktionen hier:
 
+bool DCF77Register [60] = {0};
+void DCF77RegisterMitschreiben () {
+  DCF77Register[DCF77Bitnummer] = DCF77Bitwert;
+}
+
+
+int MinuteDCF77 = 0;
+int StundeDCF77 = 0;
+int WochentagDCF77 = 0;
+
+
+//Manche bits haben immer den gleichen Wert. Wenn die nicht stimmen könnte man rückschließen, dass die Antenne kein gutes Signal empfängt
+bool FehlerAnAntenne = false;
+bool FehlerBitnummer20 = false;
+bool FehlerBitnummer0 = false;
+
+void DCF77RegisterInterpretieren () {
+  
+  WochentagDCF77 = DCF77Register[42]*1 + DCF77Register[43]*2 + DCF77Register[44]*4;
+  StundeDCF77 = DCF77Register[29]*1 + DCF77Register[30]*2 + DCF77Register[31]*4 + DCF77Register[32]*8 + DCF77Register[33]*10 + DCF77Register[34]*20;
+  MinuteDCF77 = DCF77Register[21]*1 + DCF77Register[22]*2 + DCF77Register[23]*4 + DCF77Register[24]*8 + DCF77Register[25]*10 + DCF77Register[26]*20 + DCF77Register[27]*40;
+  FehlerBitnummer20 = !DCF77Register[20];
+  FehlerBitnummer0 = DCF77Register[0];
+  FehlerAnAntenne = FehlerBitnummer0 || FehlerBitnummer20;
+}
 
 
 void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
@@ -134,134 +159,24 @@ void SekundeVergangen () {
 }
 
 
-int MinuteDCF77 = 0;
-int StundeDCF77 = 0;
-int WochentagDCF77 = 0;
 
-//Manche bits haben immer den gleichen Wert. Wenn die nicht stimmen könnte man rückschließen, dass die Antenne kein gutes Signal empfängt
-bool FehlerAnAntenne = false;
-bool FehlerBitnummer20 = false;
-bool FehlerBitnummer0 = false;
 
-void DCF77Interpretation () {
-  //In dieser Funktion könnte man switch cases anstelle von etlichen if statements verwenden?
-  Serial.println("Ich interpretiere: ");
-  if (DCF77BitnummerZaehlen == false) {
-    Serial.println("Schwachsinn!");
-  }
-  if (DCF77BitnummerZaehlen == true){
-  Serial.print("DCF77Bitnummer = ");
-  Serial.println(DCF77Bitnummer);
-  Serial.print("DCF77Bitwert = ");
-  Serial.println(DCF77Bitwert);
-  }
-
-  
-  //Bit 0 = 0 immer. "Start einer neuen Minute"
-  if (DCF77Bitnummer == 0){
-    if (DCF77Bitwert == 0){
-      FehlerBitnummer0 = false;
-    }
-    if (DCF77Bitwert == 1){
-      FehlerBitnummer0 = true;
-    }
-  }
-
-  //Bit 1-14 Wetterinformationen und Informationen des Katastrophenschutzes
-  //Bit 15 Rufbit???
-  //Bit 16 == 1: Am Ende dieser Stunde wird MEZ/MESZ umgestellt
-  //Bit 17/18: 01=MEZ 10=MESZ
-  //Bit 19 == 1: Am Ende dieser Stunde wird eine Schaltsekunde eingefügt
-  
-  
-  //Bit 20 = 1 immer. "Beginn der Zeitinformation"
-  if (DCF77Bitnummer == 20){
-    if (DCF77Bitwert == 0){
-      FehlerBitnummer20 = true;
-    }
-    if (DCF77Bitwert == 1){
-      FehlerBitnummer20 = false;
-    }
-  }
-  
-  
-  //Minuten Bit 21 bis 27
-  //Darf Werte von 0 bis 59 annehmen
-  if (DCF77Bitnummer == 21 && DCF77Bitwert == 1) {
-    MinuteDCF77 = 1;
-  }
-  if (DCF77Bitnummer == 21 && DCF77Bitwert == 0) {
-    MinuteDCF77 = 0;
-  }
-  if (DCF77Bitnummer == 22 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 2;
-  }
-  if (DCF77Bitnummer == 23 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 4;
-  }
-  if (DCF77Bitnummer == 24 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 8;
-  }
-  if (DCF77Bitnummer == 25 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 10;
-  }
-  if (DCF77Bitnummer == 26 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 20;
-  }
-  if (DCF77Bitnummer == 27 && DCF77Bitwert == 1) {
-    MinuteDCF77 = MinuteDCF77 + 40;
-  }
-  
-  
-  //Stunden Bit 29-35
-  //Darf Werte von 0 bis 23 annehmen
-  if (DCF77Bitnummer == 29 && DCF77Bitwert == 1) {
-    StundeDCF77 = 1;
-  }
-  if (DCF77Bitnummer == 29 && DCF77Bitwert == 0) {
-    StundeDCF77 = 0;
-  }
-  if (DCF77Bitnummer == 30 && DCF77Bitwert == 1) {
-    StundeDCF77 = StundeDCF77 + 2;
-  }
-  if (DCF77Bitnummer == 31 && DCF77Bitwert == 1) {
-    StundeDCF77 = StundeDCF77 + 4;
-  }
-  if (DCF77Bitnummer == 32 && DCF77Bitwert == 1) {
-    StundeDCF77 = StundeDCF77 + 8;
-  }
-  if (DCF77Bitnummer == 33 && DCF77Bitwert == 1) {
-    StundeDCF77 = StundeDCF77 + 10;
-  }
-  if (DCF77Bitnummer == 34 && DCF77Bitwert == 1) {
-    StundeDCF77 = StundeDCF77 + 20;
-  }
-  
-
-  //Wochentag Bit 42 bis 44
-  //Darf Werte von 0 bis 6 annehmen
-  if (DCF77Bitnummer == 42 && DCF77Bitwert == 1) {
-    int WochentagDCF77 = 1;
-  }
-  if (DCF77Bitnummer == 43 && DCF77Bitwert == 1) {
-    WochentagDCF77 = WochentagDCF77 + 2;
-  }
-  if (DCF77Bitnummer == 44 && DCF77Bitwert == 1) {
-    WochentagDCF77 = WochentagDCF77 + 4;
-  }
-    
-    
-}
 
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+unsigned long long TestLingLong = 0;
 
 
 void setup() {
 
   Serial.begin(115200);
   Serial.println("hi");
+  Serial.print("DCF77Register");
+  Serial.println(sizeof(DCF77Register));
+  Serial.print("unsigned long long");
+  Serial.println(sizeof(TestLingLong));
 
   //handelt es sich um ein anliegendes HIGH oder LOW signal?
   pinMode(2, INPUT);
@@ -345,7 +260,7 @@ void setup() {
 //Interrupt Service Routine, der ausgeführt wird, wenn sich Pin 2 ändert.
 ISR(INT0_vect) {
   DCF77PinFlag = true;
-  SchlafenFlag = true;
+  //SchlafenFlag = true;
   //Serial.println("Es ist etwas Passiert!");
 }
 
@@ -356,7 +271,7 @@ ISR(TIMER1_OVF_vect) {
   TCNT1 = 3036;
 
   Timer1Flag = true;
-  SchlafenFlag = true;
+  //SchlafenFlag = true;
 }
 
 
@@ -413,7 +328,8 @@ void loop() {
 
     //DCF77Bitnummer wird mit DCF77Bitwert interpretiert, Uhrzeit wird ans LCD geschickt
     if (DCF77Signal == false) {
-    DCF77Interpretation ();
+    //DCF77Interpretation ();
+    DCF77RegisterMitschreiben ();
     if (DCF77FertigKalibriert == false){
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -445,6 +361,7 @@ void loop() {
       DCF77BitnummerZaehlen = 1;
       DCF77Bitnummer = 0;
       Serial.println("DCF77Bitnummer = 0");
+      DCF77RegisterInterpretieren();
       
       Sekunde = 0;
       TCNT1 = 3036;
