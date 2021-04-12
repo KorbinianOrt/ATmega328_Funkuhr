@@ -47,6 +47,7 @@ bool DCF77BitnummerZaehlen = false;
 int DCF77Bitwert = 0;
 bool DCF77FertigKalibriert = false;
 
+
 //Knopf Flag wird in einem Interrupt gesetzt, der jedes mal ausgeführt wird, wenn ein Knopf gedrückt wird.
 //Das soll dazu führen, dass wenig Latenz beim drücken der wert sich nur um 1 verändert und, dass das drücken der Knöpfe, wenn man die Uhrzeit manuel einstellt nicht viel Latenz hat
 //Die ISR, in dem dieser Flag gesetzt wird muss noch eingerichtet werden (auf Steigende Flanke setzen)
@@ -105,6 +106,11 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
   lcd.print(":");
   lcd.print(SekundeZ);
   lcd.print(SekundeE);
+  
+  //Hier noch Einfügen: Wochentag: Zahl->Buchstaben und das dann an LCD senden
+  //lcd.setCursor(9, 0);
+  
+  
 }
   
   
@@ -132,6 +138,11 @@ int MinuteDCF77 = 0;
 int StundeDCF77 = 0;
 int WochentagDCF77 = 0;
 
+//Manche bits haben immer den gleichen Wert. Wenn die nicht stimmen könnte man rückschließen, dass die Antenne kein gutes Signal empfängt
+bool FehlerAnAntenne = false;
+bool FehlerBitnummer20 = false;
+bool FehlerBitnummer0 = false;
+
 void DCF77Interpretation () {
   //In dieser Funktion könnte man switch cases anstelle von etlichen if statements verwenden?
   Serial.println("Ich interpretiere: ");
@@ -144,10 +155,38 @@ void DCF77Interpretation () {
   Serial.print("DCF77Bitwert = ");
   Serial.println(DCF77Bitwert);
   }
+
+  
+  //Bit 0 = 0 immer. "Start einer neuen Minute"
+  if (DCF77Bitnummer == 0){
+    if (DCF77Bitwert == 0){
+      FehlerBitnummer0 = false;
+    }
+    if (DCF77Bitwert == 1){
+      FehlerBitnummer0 = true;
+    }
+  }
+
+  //Bit 1-14 Wetterinformationen und Informationen des Katastrophenschutzes
+  //Bit 15 Rufbit???
+  //Bit 16 == 1: Am Ende dieser Stunde wird MEZ/MESZ umgestellt
+  //Bit 17/18: 01=MEZ 10=MESZ
+  //Bit 19 == 1: Am Ende dieser Stunde wird eine Schaltsekunde eingefügt
+  
+  
+  //Bit 20 = 1 immer. "Beginn der Zeitinformation"
+  if (DCF77Bitnummer == 20){
+    if (DCF77Bitwert == 0){
+      FehlerBitnummer20 = true;
+    }
+    if (DCF77Bitwert == 1){
+      FehlerBitnummer20 = false;
+    }
+  }
+  
   
   //Minuten Bit 21 bis 27
   //Darf Werte von 0 bis 59 annehmen
-  
   if (DCF77Bitnummer == 21 && DCF77Bitwert == 1) {
     MinuteDCF77 = 1;
   }
@@ -173,12 +212,9 @@ void DCF77Interpretation () {
     MinuteDCF77 = MinuteDCF77 + 40;
   }
   
-  //Manchmal überträgt die Antenne ein bit Falsch. Dann kann es zu merkwürdigen Uhrzeiten kommen (34:72) oder so; So kann man wenigstens in ein paar Fällen verhindern, dass so etwas überhaupt ans LCD gesendet wird.
   
-
   //Stunden Bit 29-35
   //Darf Werte von 0 bis 23 annehmen
-  
   if (DCF77Bitnummer == 29 && DCF77Bitwert == 1) {
     StundeDCF77 = 1;
   }
@@ -200,13 +236,10 @@ void DCF77Interpretation () {
   if (DCF77Bitnummer == 34 && DCF77Bitwert == 1) {
     StundeDCF77 = StundeDCF77 + 20;
   }
-
-  //Manchmal überträgt die Antenne ein bit Falsch. Dann kann es zu merkwürdigen Uhrzeiten kommen (34:72) oder so; So kann man wenigstens in ein paar Fällen verhinder, dass so etwas überhaupt ans LCD gesendet wird.
   
 
   //Wochentag Bit 42 bis 44
   //Darf Werte von 0 bis 6 annehmen
-  
   if (DCF77Bitnummer == 42 && DCF77Bitwert == 1) {
     int WochentagDCF77 = 1;
   }
@@ -216,18 +249,7 @@ void DCF77Interpretation () {
   if (DCF77Bitnummer == 44 && DCF77Bitwert == 1) {
     WochentagDCF77 = WochentagDCF77 + 4;
   }
-  
-  if (WochentagDCF77 < 7){
-    Wochentag = WochentagDCF77;
-    Serial.println("Wochentag < 7");
-    Serial.println(Wochentag);
-  }
-  else {
-    Serial.println("Wochentag > Sonntag lēl");
-  }
-
-
-  
+    
     
 }
 
@@ -427,7 +449,10 @@ void loop() {
       Sekunde = 0;
       TCNT1 = 3036;
 
-       //Einmal in der Minute werden die Werte aus DCF77Interpretieren auf Minute, Stunde, Wochentag übertragen
+      //Einmal in der Minute werden die Werte aus DCF77Interpretieren auf Minute, Stunde, Wochentag übertragen
+      //So kann man verhindern, dass Wochentag, Stunde oder Minute Werte annimmt, die eigentlich gar nicht möglich sind. (z.b. 32:74)
+      
+      //Minute überprüfen
       if (MinuteDCF77 < 60) {
         Minute = MinuteDCF77;
         Serial.println("Minuten < 60");
@@ -436,7 +461,8 @@ void loop() {
       else {
       Serial.println("Minute > 60!!!!!!");
       }
-      
+
+      //Stunde überprüfen
       if (StundeDCF77 < 24){
         Stunde = StundeDCF77;
         Serial.println("Stunden < 60");
@@ -446,9 +472,23 @@ void loop() {
       Serial.println("Stunde > 24!!!!!!");
       }
 
+      //Wochentag überprüfen
+      if (WochentagDCF77 < 7){
+        Wochentag = WochentagDCF77;
+        Serial.println("Wochentag < 7");
+        Serial.println(Wochentag);
+      }
+      else {
+        Serial.println("Wochentag > Sonntag lēl");
+      }
       
+      //WochentagDCF77, StundeDCF77 und MinuteDCF77 werden hier wieder auf 0 gesetzt, damit sie innerhalb der nächsten Minute komplett neu interpretiert werden können.
+      WochentagDCF77 = 0;
+      StundeDCF77 = 0;
+      MinuteDCF77 = 0;
 
     }
+    
   }
 
 
@@ -471,6 +511,10 @@ void loop() {
       lcd.setCursor(0, 1);
       lcd.print ("--:XX:--");
     }
+
+    //sollte man auch noch Sekunde einstellen können?
+    //Idee: wenn man in den Manuellen einstellen Modus geht: Sekunde = 0; ?
+    
   }
   
 }
