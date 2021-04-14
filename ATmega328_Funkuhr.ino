@@ -84,9 +84,10 @@ bool SekundeEinstellen = false;
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Alle Funktionen hier:
 
-bool DCF77Register [60] = {0};
+//DCF77 Werte werden alle an ihrer eigenen Stelle an einem Array gespeichert.
+bool DCF77Array [60] = {0};
 void DCF77RegisterMitschreiben () {
-  DCF77Register[DCF77Bitnummer] = DCF77Bitwert;
+  DCF77Array[DCF77Bitnummer] = DCF77Bitwert;
 }
 
 
@@ -100,13 +101,13 @@ bool FehlerAnAntenne = false;
 bool FehlerBitnummer20 = false;
 bool FehlerBitnummer0 = false;
 
+//Aus dem DCF77Array werden jetzt alle Werte interpretiert 
 void DCF77RegisterInterpretieren () {
-  
-  WochentagDCF77 = DCF77Register[42]*1 + DCF77Register[43]*2 + DCF77Register[44]*4;
-  StundeDCF77 = DCF77Register[29]*1 + DCF77Register[30]*2 + DCF77Register[31]*4 + DCF77Register[32]*8 + DCF77Register[33]*10 + DCF77Register[34]*20;
-  MinuteDCF77 = DCF77Register[21]*1 + DCF77Register[22]*2 + DCF77Register[23]*4 + DCF77Register[24]*8 + DCF77Register[25]*10 + DCF77Register[26]*20 + DCF77Register[27]*40;
-  FehlerBitnummer20 = !DCF77Register[20];
-  FehlerBitnummer0 = DCF77Register[0];
+  WochentagDCF77 = DCF77Array[42]*1 + DCF77Array[43]*2 + DCF77Array[44]*4;
+  StundeDCF77 = DCF77Array[29]*1 + DCF77Array[30]*2 + DCF77Array[31]*4 + DCF77Array[32]*8 + DCF77Array[33]*10 + DCF77Array[34]*20;
+  MinuteDCF77 = DCF77Array[21]*1 + DCF77Array[22]*2 + DCF77Array[23]*4 + DCF77Array[24]*8 + DCF77Array[25]*10 + DCF77Array[26]*20 + DCF77Array[27]*40;
+  FehlerBitnummer20 = !DCF77Array[20];
+  FehlerBitnummer0 = DCF77Array[0];
   FehlerAnAntenne = FehlerBitnummer0 || FehlerBitnummer20;
 }
 
@@ -134,7 +135,6 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
   
   //Hier noch Einfügen: Wochentag: Zahl->Buchstaben und das dann an LCD senden
   //lcd.setCursor(9, 0);
-  
   
 }
   
@@ -166,17 +166,12 @@ void SekundeVergangen () {
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-unsigned long long TestLingLong = 0;
 
 
 void setup() {
 
   Serial.begin(115200);
   Serial.println("hi");
-  Serial.print("DCF77Register");
-  Serial.println(sizeof(DCF77Register));
-  Serial.print("unsigned long long");
-  Serial.println(sizeof(TestLingLong));
 
   //handelt es sich um ein anliegendes HIGH oder LOW signal?
   pinMode(2, INPUT);
@@ -398,11 +393,6 @@ void loop() {
       else {
         Serial.println("Wochentag > Sonntag lēl");
       }
-      
-      //WochentagDCF77, StundeDCF77 und MinuteDCF77 werden hier wieder auf 0 gesetzt, damit sie innerhalb der nächsten Minute komplett neu interpretiert werden können.
-      WochentagDCF77 = 0;
-      StundeDCF77 = 0;
-      MinuteDCF77 = 0;
 
     }
     
