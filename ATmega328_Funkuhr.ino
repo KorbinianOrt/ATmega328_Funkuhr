@@ -53,11 +53,9 @@ bool DCF77FertigKalibriert = false;
 //Die ISR, in dem dieser Flag gesetzt wird muss noch eingerichtet werden (auf Steigende Flanke setzen)
 volatile bool KnopfFlag = false;
 
-//Wenn sich Pin2 ändert wird ein Flag gesetzt
-volatile bool DCF77PinFlag = false;
 
-//Wenn TCNT1 überläuft wird ein Flag gesetzt
-volatile bool Timer1Flag = false;
+
+
 
 //Wenn TCNT1 überläuft oder sich Pin2 ändert muss der Controller aus dem Schlaf geweckt werden
 volatile bool SchlafenFlag = false;
@@ -86,7 +84,7 @@ bool SekundeEinstellen = false;
 
 //DCF77 Werte werden alle an ihrer eigenen Stelle an einem Array gespeichert.
 bool DCF77Array [60] = {0};
-void DCF77RegisterMitschreiben () {
+void DCF77ArrayMitschreiben () {
   DCF77Array[DCF77Bitnummer] = DCF77Bitwert;
 }
 
@@ -102,7 +100,7 @@ bool FehlerBitnummer20 = false;
 bool FehlerBitnummer0 = false;
 
 //Aus dem DCF77Array werden jetzt alle Werte interpretiert 
-void DCF77RegisterInterpretieren () {
+void DCF77ArrayInterpretieren () {
   WochentagDCF77 = DCF77Array[42]*1 + DCF77Array[43]*2 + DCF77Array[44]*4;
   StundeDCF77 = DCF77Array[29]*1 + DCF77Array[30]*2 + DCF77Array[31]*4 + DCF77Array[32]*8 + DCF77Array[33]*10 + DCF77Array[34]*20;
   MinuteDCF77 = DCF77Array[21]*1 + DCF77Array[22]*2 + DCF77Array[23]*4 + DCF77Array[24]*8 + DCF77Array[25]*10 + DCF77Array[26]*20 + DCF77Array[27]*40;
@@ -165,8 +163,6 @@ void SekundeVergangen () {
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
 
 void setup() {
 
@@ -252,21 +248,24 @@ void setup() {
 }
 
 
+volatile bool DCF77PinFlag = false;
 //Interrupt Service Routine, der ausgeführt wird, wenn sich Pin 2 ändert.
 ISR(INT0_vect) {
   DCF77PinFlag = true;
-  //SchlafenFlag = true;
-  //Serial.println("Es ist etwas Passiert!");
 }
 
+volatile bool ButtonFlag = false;
+//Interrupt Service Routine, die jedes mal aktiviert wird, wenn einer der Knöpfe, mit der man die Uhr bedient wird gedrückt wird
+ISR(INT1_vect){
+  ButtonFlag = true;
+}
 
+volatile bool Timer1Flag = false;
 //Interrupt Service Routine, der ausgelöst wird, wenn TCNT1 einen Overflow-flag im TIFR1-Register hinterlässt
 ISR(TIMER1_OVF_vect) {
   //TCNT1-counter muss in diesem Interrupt auf Startwert für 1000ms pro Durchlauf gesetzt werden!
   TCNT1 = 3036;
-
   Timer1Flag = true;
-  //SchlafenFlag = true;
 }
 
 
@@ -279,40 +278,47 @@ void loop() {
   //TCNT1 wird 1 mal in der Minute mit dem Funksignal synchronisiert
   if (FunkuhrModus == true && Timer1Flag == true){
       Timer1Flag = 0;
-      
       SekundeVergangen ();
-
-      
       if (DCF77FertigKalibriert == true){
       UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
       }
   }
 
-  
-  //Wenn die Uhr im FunkuhrModus ist, befindet sie sich in Diesem Loop
-  //DCF77PinFlag wird im ISR  auf 1 gesetzt (MC geht in diesen Loop, wenn sich das Signal am Antennenpin ändert)
-  if (DCF77PinFlag == 1 && FunkuhrModus == 1) {
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    //So Läuft die Interpretation einer Uhrzeit ab:
+    //  Innerhalb einer Sekunde:
+    //1.  Feststellen ob DCF77Bitwert 0 oder 1 
+    //2.  DCF77Bitnummer und DCF77Bitwert werden verknüpft und DCF77Array mitgeschrieben
+    //3.  DCF77Bitnummer++ (zählt von 0 bis 58, wenn 59 erreicht ist wird er auf 0 gesetzt)
+    //  Am Ende einer Minute:
+    //4.  Uhrzeit der kommenden Minute wird aus DCF77Array interpretiert 
+    //5.  Kurze Überprüfung, ob die Interpretation fehlerhaft sein könnte
+    //6.  Interpretierte Uhrzeit wird übernommen
+    //Das schicken der Uhrzeit an den LCD ist seperat hiervon
+    //Wenn die Uhr im FunkuhrModus ist und sich Pin2 ändert
+  //DCF77PinFlag wird im ISR auf 1 gesetzt (MC geht hier rein, wenn sich das Signal am Antennenpin ändert)
+  if (DCF77PinFlag == true && FunkuhrModus == true) {
     DCF77PinFlag = 0;
     DCF77Signal = digitalRead(2);
-    Serial.print("Pin 2: ");
-    Serial.println(DCF77Signal);
+    //Serial.print("Pin 2: ");
+    //Serial.println(DCF77Signal);
 
-    //Pin2: Low->High
-    //Soll nur dazu dienen, um DauerLow korrekt zu messen
+    //1. Hier
+    //DauerHigh & DauerLow werden hier gemessen
+    //DCF77Bitwert wird entsprechend der DauerHigh zugeordnet
     if (DCF77Signal == true) {
       ZeitpunktUp = millis();
-      Serial.print("ZeitpunktUp: ");
-      Serial.println(ZeitpunktUp);
+      //Serial.print("ZeitpunktUp: ");
+      //Serial.println(ZeitpunktUp);
       DauerLow = ZeitpunktUp - ZeitpunktDown;
     }
     else {
       ZeitpunktDown = millis();
-      Serial.print("ZeitpunktDown: ");
-      Serial.println(ZeitpunktDown);
+      //Serial.print("ZeitpunktDown: ");
+      //Serial.println(ZeitpunktDown);
       DauerHigh = ZeitpunktDown - ZeitpunktUp;
     }
-
-    //DCF77Bitwert wird hier auf 1 oder 0 gesetzt
     if (DauerHigh > 150){
     DCF77Bitwert = 1;
     }
@@ -320,11 +326,14 @@ void loop() {
     DCF77Bitwert = 0;
     }
 
-
-    //DCF77Bitnummer wird mit DCF77Bitwert interpretiert, Uhrzeit wird ans LCD geschickt
+    //2. Hier
+    //DCF77Bitnummer wird mit DCF77Bitwert interpretiert
     if (DCF77Signal == false) {
     //DCF77Interpretation ();
-    DCF77RegisterMitschreiben ();
+    DCF77ArrayMitschreiben ();
+    Serial.print(DCF77Bitnummer);
+    Serial.print(" : ");
+    Serial.println(DCF77Bitwert);
     if (DCF77FertigKalibriert == false){
       lcd.clear();
       lcd.setCursor(0, 0);
@@ -332,7 +341,7 @@ void loop() {
       }
     }
 
-
+    //3. Hier
     //Soll dazu dienen, die Bitnummer korrekt mit zu zählen
     if(DCF77BitnummerZaehlen == true && DCF77Signal == true){
     DCF77Bitnummer++;
@@ -343,9 +352,7 @@ void loop() {
       DCF77FertigKalibriert = true;     
     }
 
-
-
-    
+    //4. Hier
     //Beginn einer neuen Minute via Funksignal
     if (DauerLow > 1500 && DCF77Signal == true) {
       Serial.println ("----- Beginn neuer Minute hier -----");
@@ -355,50 +362,36 @@ void loop() {
       Serial.println(Minute);
       DCF77BitnummerZaehlen = 1;
       DCF77Bitnummer = 0;
-      Serial.println("DCF77Bitnummer = 0");
-      DCF77RegisterInterpretieren();
+      Serial.println("DCF77Bitnummer = 0 gesetzt");
+      DCF77ArrayInterpretieren();
       
       Sekunde = 0;
-      TCNT1 = 3036;
+      //TCNT1 wird auf 0 gesetzt, damit kommt der Interrupt durch den TCNT1 Overflow immer ein bisschen später, als die LOW->HIGH-Flanke von der Antenne
+      TCNT1 = 0;
 
+      //5. und 6. Hier
       //Einmal in der Minute werden die Werte aus DCF77Interpretieren auf Minute, Stunde, Wochentag übertragen
       //So kann man verhindern, dass Wochentag, Stunde oder Minute Werte annimmt, die eigentlich gar nicht möglich sind. (z.b. 32:74)
-      
       //Minute überprüfen
       if (MinuteDCF77 < 60) {
         Minute = MinuteDCF77;
-        Serial.println("Minuten < 60");
-        Serial.println(Minute);
       }
-      else {
-      Serial.println("Minute > 60!!!!!!");
-      }
-
       //Stunde überprüfen
       if (StundeDCF77 < 24){
         Stunde = StundeDCF77;
-        Serial.println("Stunden < 60");
-        Serial.println(Stunde);
       }
-      else {
-      Serial.println("Stunde > 24!!!!!!");
-      }
-
       //Wochentag überprüfen
       if (WochentagDCF77 < 7){
         Wochentag = WochentagDCF77;
-        Serial.println("Wochentag < 7");
-        Serial.println(Wochentag);
       }
-      else {
-        Serial.println("Wochentag > Sonntag lēl");
-      }
-
+      
     }
     
   }
 
 
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //Wenn die Uhr nicht im FunkuhrModus ist:
   if (FunkuhrModus == false && Timer1Flag == true){
     Timer1Flag = 0;
     SekundeVergangen ();
