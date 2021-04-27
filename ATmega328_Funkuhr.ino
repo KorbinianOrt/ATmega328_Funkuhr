@@ -99,11 +99,11 @@ bool FehlerAnAntenne = false;
 bool FehlerBitnummer20 = false;
 bool FehlerBitnummer0 = false;
 
-//Aus dem DCF77Array werden jetzt alle Werte interpretiert 
+//Aus dem DCF77Array werden jetzt alle Werte interpretiert
 void DCF77ArrayInterpretieren () {
-  WochentagDCF77 = DCF77Array[42]*1 + DCF77Array[43]*2 + DCF77Array[44]*4;
-  StundeDCF77 = DCF77Array[29]*1 + DCF77Array[30]*2 + DCF77Array[31]*4 + DCF77Array[32]*8 + DCF77Array[33]*10 + DCF77Array[34]*20;
-  MinuteDCF77 = DCF77Array[21]*1 + DCF77Array[22]*2 + DCF77Array[23]*4 + DCF77Array[24]*8 + DCF77Array[25]*10 + DCF77Array[26]*20 + DCF77Array[27]*40;
+  WochentagDCF77 = DCF77Array[42] * 1 + DCF77Array[43] * 2 + DCF77Array[44] * 4;
+  StundeDCF77 = DCF77Array[29] * 1 + DCF77Array[30] * 2 + DCF77Array[31] * 4 + DCF77Array[32] * 8 + DCF77Array[33] * 10 + DCF77Array[34] * 20;
+  MinuteDCF77 = DCF77Array[21] * 1 + DCF77Array[22] * 2 + DCF77Array[23] * 4 + DCF77Array[24] * 8 + DCF77Array[25] * 10 + DCF77Array[26] * 20 + DCF77Array[27] * 40;
   FehlerBitnummer20 = !DCF77Array[20];
   FehlerBitnummer0 = DCF77Array[0];
   FehlerAnAntenne = FehlerBitnummer0 || FehlerBitnummer20;
@@ -112,14 +112,14 @@ void DCF77ArrayInterpretieren () {
 
 void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
 
-  //Damit die Uhrzeit am LCD korrekt angezeigt wird muss man 
+  //Damit die Uhrzeit am LCD korrekt angezeigt wird muss man
   int SekundeE = SekundeLCD % 10;
   int SekundeZ = SekundeLCD / 10 % 10;
   int MinuteE = MinuteLCD % 10;
   int MinuteZ = MinuteLCD / 10 % 10;
   int StundeE = StundeLCD % 10;
   int StundeZ = StundeLCD / 10 % 10;
-  
+
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(StundeZ);
@@ -130,13 +130,13 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
   lcd.print(":");
   lcd.print(SekundeZ);
   lcd.print(SekundeE);
-  
+
   //Hier noch Einfügen: Wochentag: Zahl->Buchstaben und das dann an LCD senden
   //lcd.setCursor(9, 0);
-  
+
 }
-  
-  
+
+
 void SekundeVergangen () {
   if (Sekunde < 59) {
     Sekunde++;
@@ -191,14 +191,9 @@ void setup() {
   delay (1000);
   lcd.clear();
 
-
-  /* Erklärung zum hier Verwendeten Timer:
-
-     TCCR = Timer/Counter Control Register
-     Diese 8 Bit Register werden verwendet für alle Timer und Counter Einstellungen
-
-
-     Ich möchte in das 16 Bit TCNT1 Register zählen (16-bit Timer/Counter1) siehe s. 89
+  //16Bit Timer Register TCNT1: (für Sekunden)
+  /* Erklärung zum 16 Bit Timer:
+     Ich möchte in das 16 Bit TCNT1 Register zählen, um so 1 mal pro Sekunde einen interrupt triggern zu können (16-bit Timer/Counter1) siehe s. 89
 
      Ich möchte "Normal Mode" (siehe s.100)
      Hier wird ins TCNT1 16 bit Reigster gezählt. Wenn es voll ist wird TOV1 = 1 und TCNT1 = 0 gesetzt.
@@ -236,15 +231,53 @@ void setup() {
      TIMSK1
      (TIFR1)
   */
-  //Diese Werte müssen die Register haben:
-
+  //Diese Werte müssen die Register haben: (siehe Seite 108 ff)
   TCCR1A = 0b00000000;
   TCCR1B = 0b00000100;
   TIMSK1 = 0b00000001;
-
   //TCNT1 Startwert:
   TCNT1 = 3036;
 
+  //8Bit Timer Register TCNT2: (für Zeit zischen Änderungen am Antennenpin)
+  /*Erklärung zum 8 Bit Timer:
+    Ich möchte Normal Mode verwenden (siehe Seite 116ff)
+    WGM22 = 0
+    WGM21 = 0
+    WGM20 = 0
+    "In normal operation the TimerOverflowFlag (TOV2) will be set in the same timer clock cycle as the TCNT2 becomes 0"
+
+    Prescaler: (siehe Seite 131ff)
+    mit einem 1024 prescaler hat das 8 bit Register 61 mal in der Sekunde einen Overflow
+    CS22 = 1
+    CS21 = 1
+    CS20 = 1
+    6.1 mal für 0.1 Sek (logische 0)
+    12.2 mal für 0.2 Sek (logische 1)
+    109.8 oder 115.9 mal für Pause zwischen BitNummer 58 und 0
+
+    Ich brauche eine Variable, in der +1 gerechnet wird, jedes mal, wenn TCNT2 einen Overflow hat
+
+    Wenn das 8bit Counter Register (TCNT2) voll ist soll ein Interrupt getriggert werden
+    im "Timer/Counter2 Interrupt Mask Register" (TISMK2) muss das "Timer/Counter2 Overflow Interrupt Enable" bit (TOIE2) gesetzt werden
+    siehe S.88
+    Im "Timer/Counter2 Interrupt Flag Register" (TIFR2) wird das "Timer Overflow Vector0" (TOV2) Bit bei einem Overflow von TCNT2 jetzt automatisch gesetzt.
+    TOV2 wird automatisch gelöscht, wenn der Overflow Interrupt Vector ausgeführt wurde.
+    siehe S.88
+
+    kein allgemeiner Startwert für TCNT2, aber jedes mal, wenn logische 0, logische 1, oder Pause zwischen Bit58 und Bit0 entdeckt wurde sollte man zurücksetzen.
+
+    alle hierfür verwendeten Bits sind in den Registern:
+    TCCR2A
+    TCCR0B
+    TIMSK2
+    TIFR2
+  */
+  //Diese Werte müssen die Register haben: (siehe Seite 127ff)
+  TCCR2A = 0b00000000;
+  TCCR2B = 0b00000111;
+  TIMSK2 = 0b00000001;
+  TCNT2 = 0;
+  
 }
 
 
@@ -256,7 +289,7 @@ ISR(INT0_vect) {
 
 volatile bool ButtonFlag = false;
 //Interrupt Service Routine, die jedes mal aktiviert wird, wenn einer der Knöpfe, mit der man die Uhr bedient wird gedrückt wird
-ISR(INT1_vect){
+ISR(INT1_vect) {
   ButtonFlag = true;
 }
 
@@ -266,6 +299,14 @@ ISR(TIMER1_OVF_vect) {
   //TCNT1-counter muss in diesem Interrupt auf Startwert für 1000ms pro Durchlauf gesetzt werden!
   TCNT1 = 3036;
   Timer1Flag = true;
+  //Serial.println(TCNT1);
+}
+
+
+volatile int Timer2OverflowCounter = 0;
+//Interrupt Service Routine, der ausgelöst wird, wenn TCNT0 einen Overflow-flag im TIFR0-Register hinterlässt
+ISR(TIMER2_OVF_vect) {
+  Timer2OverflowCounter = 0;
 }
 
 
@@ -274,29 +315,30 @@ ISR(TIMER1_OVF_vect) {
 void loop() {
 
 
+
+
   //Wenn die Uhr im Funkuhr Modus ist zähle ich unabhängig von der Antenne die Sekunden mit
   //TCNT1 wird 1 mal in der Minute mit dem Funksignal synchronisiert
-  if (FunkuhrModus == true && Timer1Flag == true){
-      Timer1Flag = 0;
-      SekundeVergangen ();
-      if (DCF77FertigKalibriert == true){
-      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
-      }
+  if (FunkuhrModus == true && Timer1Flag == true) {
+    Timer1Flag = 0;
+    SekundeVergangen ();
+    if (DCF77FertigKalibriert == true) {
+      UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
+    }
   }
 
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    //So Läuft die Interpretation einer Uhrzeit ab:
-    //  Innerhalb einer Sekunde:
-    //1.  Feststellen ob DCF77Bitwert 0 oder 1 
-    //2.  DCF77Bitnummer und DCF77Bitwert werden verknüpft und DCF77Array mitgeschrieben
-    //3.  DCF77Bitnummer++ (zählt von 0 bis 58, wenn 59 erreicht ist wird er auf 0 gesetzt)
-    //  Am Ende einer Minute:
-    //4.  Uhrzeit der kommenden Minute wird aus DCF77Array interpretiert 
-    //5.  Kurze Überprüfung, ob die Interpretation fehlerhaft sein könnte
-    //6.  Interpretierte Uhrzeit wird übernommen
-    //Das schicken der Uhrzeit an den LCD ist seperat hiervon
-    //Wenn die Uhr im FunkuhrModus ist und sich Pin2 ändert
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //So Läuft die Interpretation einer Uhrzeit ab:
+  //  Innerhalb einer Sekunde:
+  //1.  Feststellen ob DCF77Bitwert 0 oder 1
+  //2.  DCF77Bitnummer und DCF77Bitwert werden verknüpft und DCF77Array mitgeschrieben
+  //3.  DCF77Bitnummer++ (zählt von 0 bis 58, wenn 59 erreicht ist wird er auf 0 gesetzt)
+  //  Am Ende einer Minute:
+  //4.  Uhrzeit der kommenden Minute wird aus DCF77Array interpretiert
+  //5.  Kurze Überprüfung, ob die Interpretation fehlerhaft sein könnte
+  //6.  Interpretierte Uhrzeit wird übernommen
+  //Das schicken der Uhrzeit an den LCD ist seperat hiervon
+  //Wenn die Uhr im FunkuhrModus ist und sich Pin2 ändert
   //DCF77PinFlag wird im ISR auf 1 gesetzt (MC geht hier rein, wenn sich das Signal am Antennenpin ändert)
   if (DCF77PinFlag == true && FunkuhrModus == true) {
     DCF77PinFlag = 0;
@@ -319,37 +361,37 @@ void loop() {
       //Serial.println(ZeitpunktDown);
       DauerHigh = ZeitpunktDown - ZeitpunktUp;
     }
-    if (DauerHigh > 150){
-    DCF77Bitwert = 1;
+    if (DauerHigh > 150) {
+      DCF77Bitwert = 1;
     }
     else {
-    DCF77Bitwert = 0;
+      DCF77Bitwert = 0;
     }
 
     //2. Hier
     //DCF77Bitnummer wird mit DCF77Bitwert interpretiert
     if (DCF77Signal == false) {
-    //DCF77Interpretation ();
-    DCF77ArrayMitschreiben ();
-    Serial.print(DCF77Bitnummer);
-    Serial.print(" : ");
-    Serial.println(DCF77Bitwert);
-    if (DCF77FertigKalibriert == false){
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("warte auf Signal");
+      //DCF77Interpretation ();
+      DCF77ArrayMitschreiben ();
+      Serial.print(DCF77Bitnummer);
+      Serial.print(" : ");
+      Serial.println(DCF77Bitwert);
+      if (DCF77FertigKalibriert == false) {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("warte auf Signal");
       }
     }
 
     //3. Hier
     //Soll dazu dienen, die Bitnummer korrekt mit zu zählen
-    if(DCF77BitnummerZaehlen == true && DCF77Signal == true){
-    DCF77Bitnummer++;
+    if (DCF77BitnummerZaehlen == true && DCF77Signal == true) {
+      DCF77Bitnummer++;
     }
-    if (DCF77Bitnummer == 59){
+    if (DCF77Bitnummer == 59) {
       Serial.println("DCF77Bitnummer = 59!");
       DCF77Bitnummer = 0;
-      DCF77FertigKalibriert = true;     
+      DCF77FertigKalibriert = true;
     }
 
     //4. Hier
@@ -364,7 +406,7 @@ void loop() {
       DCF77Bitnummer = 0;
       Serial.println("DCF77Bitnummer = 0 gesetzt");
       DCF77ArrayInterpretieren();
-      
+
       Sekunde = 0;
       //TCNT1 wird auf 0 gesetzt, damit kommt der Interrupt durch den TCNT1 Overflow immer ein bisschen später, als die LOW->HIGH-Flanke von der Antenne
       TCNT1 = 0;
@@ -377,44 +419,52 @@ void loop() {
         Minute = MinuteDCF77;
       }
       //Stunde überprüfen
-      if (StundeDCF77 < 24){
+      if (StundeDCF77 < 24) {
         Stunde = StundeDCF77;
       }
       //Wochentag überprüfen
-      if (WochentagDCF77 < 7){
+      if (WochentagDCF77 < 7) {
         Wochentag = WochentagDCF77;
       }
-      
+
     }
-    
+
   }
 
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   //Wenn die Uhr nicht im FunkuhrModus ist:
-  if (FunkuhrModus == false && Timer1Flag == true){
+  if (FunkuhrModus == false && Timer1Flag == true) {
     Timer1Flag = 0;
     SekundeVergangen ();
-    UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
-    
+    UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
   }
 
+
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //zwischen Modi hin und her schalten
+  if (ButtonFlag == true) {
+    //if
+  }
+
+
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   //Wenn man die Uhrzeit an der Uhr manuell einstellen möchte
-  if (FunkuhrModus == false && ManuelEinstellen == true){
+  if (FunkuhrModus == false && ManuelEinstellen == true) {
     if (StundeEinstellen == 1 && KnopfFlag == 1) {
-      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
+      UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
       lcd.setCursor(0, 1);
       lcd.print ("XX:--:--");
     }
     if (MinuteEinstellen == false && KnopfFlag == true) {
-      UhrzeitAnLCDSenden (Stunde,Minute,Sekunde);
+      UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
       lcd.setCursor(0, 1);
       lcd.print ("--:XX:--");
     }
 
     //sollte man auch noch Sekunde einstellen können?
     //Idee: wenn man in den Manuellen einstellen Modus geht: Sekunde = 0; ?
-    
+
   }
-  
+
 }
