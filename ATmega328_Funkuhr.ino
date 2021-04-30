@@ -48,35 +48,15 @@ int DCF77Bitwert = 0;
 bool DCF77FertigKalibriert = false;
 
 
-//Knopf Flag wird in einem Interrupt gesetzt, der jedes mal ausgeführt wird, wenn ein Knopf gedrückt wird.
-//Das soll dazu führen, dass wenig Latenz beim drücken der wert sich nur um 1 verändert und, dass das drücken der Knöpfe, wenn man die Uhrzeit manuel einstellt nicht viel Latenz hat
-//Die ISR, in dem dieser Flag gesetzt wird muss noch eingerichtet werden (auf Steigende Flanke setzen)
-volatile bool KnopfFlag = false;
-
-
-
-
-
-//Wenn TCNT1 überläuft oder sich Pin2 ändert muss der Controller aus dem Schlaf geweckt werden
-volatile bool SchlafenFlag = false;
-//Schlafen ignoriere ich vorerst. Es wird dann eingebaut, wenn die Uhr praktisch funktioniert
-
-//Wenn FunkuhrModus == 1, dann Funkuhr; Wenn FunkuhrModus == 0 autonome Uhr
-bool FunkuhrModus = true;
-
-//Wenn ManuelEinstellen == 1 befindet man sich im Modus, in dem man die Uhrzeit manuell einstellen kann
-bool ManuelEinstellen = false;
-bool StundeEinstellen = false;
-bool MinuteEinstellen = false;
-bool SekundeEinstellen = false;
-
-
-//Knöpfe, die ich noch hinzufügen möchte:
-//aktivieren/Beenden der Funkuhr; Wenn im Manuell einstellen: Wechsel zwischen Stunde, Minute, Sekunde
-//Manuelles Einstellen starten/beenden
-//++
-//--
-
+//Mein Statusdiagramm hat 8 Status
+bool Funkbetrieb = true;
+bool Normalbetrieb = false;
+bool WeckerAuswahl = false;
+bool ManuellStundeEinstellen = false;
+bool ManuellMinuteEinstellen = false;
+bool WeckerTagEinstellen = false;
+bool WeckerStundeEinstellen = false;
+bool WeckerMinuteEinstellen = false;
 
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -152,7 +132,7 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
 
   
   if (DCF77FertigKalibriert == false) {
-    if (FunkuhrModus == true) {
+    if (Funkbetrieb == true) {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("warte auf Signal");
@@ -190,7 +170,7 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
       case 7: lcd.print("So"); break;
     }
     //Was im FunkuhrModus angezeigt wird
-    if (FunkuhrModus == true) {
+    if (Funkbetrieb == true) {
       if (FehlerAnAntenne == true) {
       lcd.print(" -?");
       }
@@ -244,6 +224,41 @@ void SekundeVergangen () {
 
 
 
+//A0 bis A5 sind die Buttons, mit denen der Wecker bedient wird
+int const ButtonD = A0;
+int const ButtonW = A1;
+int const ButtonZ = A2;
+int const ButtonPlus = A3;
+int const ButtonMinus = A4;
+int const ButtonLicht = A5;
+void InputPinsLesen(){
+  digitalRead(ButtonD);
+  digitalRead(ButtonW);
+  digitalRead(ButtonZ);
+  digitalRead(ButtonPlus);
+  digitalRead(ButtonMinus);
+  digitalRead(ButtonLicht);
+  if (ButtonD == HIGH){
+      Serial.println("ButtonD gedrückt");
+    }
+    if (ButtonW == HIGH){
+      Serial.println("ButtonW gedrückt");
+    }
+    if (ButtonZ == HIGH){
+      Serial.println("ButtonZ gedrückt");
+    }
+    if (ButtonPlus == HIGH){
+      Serial.println("ButtonPlus gedrückt");
+    }
+    if (ButtonMinus == HIGH){
+      Serial.println("ButtonMinus gedrückt");
+    }
+    if (ButtonLicht == HIGH){
+      Serial.println("ButtonLicht gedrückt");
+    }
+}
+
+
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -252,8 +267,20 @@ void setup() {
   Serial.begin(115200);
   Serial.println("hi");
 
-  //handelt es sich um ein anliegendes HIGH oder LOW signal?
-  pinMode(2, INPUT);
+  //Pin2 = Pin für die Antenne
+  int const Antenne = 2;
+  pinMode(Antenne, INPUT);
+  
+  //A0 bis A5 sind die Buttons, mit denen der Wecker bedient wird
+  pinMode(ButtonD, INPUT);
+  pinMode(ButtonW, INPUT);
+  pinMode(ButtonZ, INPUT);
+  pinMode(ButtonPlus, INPUT);
+  pinMode(ButtonMinus, INPUT);
+  pinMode(ButtonLicht, INPUT);
+  
+
+  
 
   //I-Bit wird gesetzt -> Interrupts sind global aktiviert (S. 15)
   sei();
@@ -370,7 +397,7 @@ ISR(INT0_vect) {
   DCF77PinFlag = true;
 }
 
-volatile bool ButtonFlag = false;
+volatile bool ButtonFlag = true;
 //Interrupt Service Routine, die jedes mal aktiviert wird, wenn einer der Knöpfe, mit der man die Uhr bedient wird gedrückt wird
 ISR(INT1_vect) {
   ButtonFlag = true;
@@ -394,21 +421,181 @@ ISR(TIMER2_OVF_vect) {
 
 
 
+
 void loop() {
 
 
-  //Wenn die Uhr im Funkuhr Modus ist zähle ich unabhängig von der Antenne die Sekunden mit
+
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //zwischen Modi hin und her schalten und Uhrzeit und Wecker einstellen
+  //Die 8 Status sind global definiert
+  if (ButtonFlag == true) {
+    InputPinsLesen();
+
+    if (Funkbetrieb == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        Funkbetrieb == false;
+        ManuellStundeEinstellen == true;
+      }
+      if (ButtonW == HIGH){
+        Funkbetrieb == false;
+        WeckerAuswahl == true;
+      }
+      if (ButtonPlus == HIGH){
+        Funkbetrieb == false;
+        Normalbetrieb == true;
+      }
+    }
+    
+    if (Normalbetrieb == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        Normalbetrieb == false;
+        ManuellStundeEinstellen = true;
+      }
+      if (ButtonW == HIGH) {
+        Normalbetrieb == false;
+        WeckerAuswahl == true;
+      }
+      if (ButtonPlus == true) {
+        Normalbetrieb == false;
+        Funkbetrieb == true;
+      }
+      
+    }
+    
+    if (WeckerAuswahl == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        //nächster Alarm, 0,1,2,3,...,neu
+      }
+      if (ButtonW == HIGH) {
+        //AlarmModus für diesen Alarm umschalten
+      }
+      if (ButtonZ == HIGH) {
+        WeckerAuswahl == false;
+        Normalbetrieb == true;
+      }
+      if (ButtonPlus == HIGH) {
+        WeckerAuswahl == false;
+        WeckerTagEinstellen = true;
+      }
+      if (ButtonMinus == HIGH) {
+        //Den ausgewählten Alarm löschen
+      }
+    }
+
+    if (WeckerTagEinstellen == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        //nächsten Tag auswählen
+      }
+      if (ButtonW == HIGH) {
+        WeckerTagEinstellen = false;
+        WeckerStundeEinstellen = true;
+      }
+      if (ButtonZ == HIGH) {
+        WeckerTagEinstellen = false;
+        WeckerAuswahl == true;
+      }
+      if (ButtonPlus == HIGH) {
+        //Wecker für diesen Tag aktivieren
+      }
+      if (ButtonMinus == HIGH) {
+        //Wecker für diesen Tag deaktivieren
+      }
+    }
+    
+    if (WeckerStundeEinstellen == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonW == HIGH) {
+        WeckerStundeEinstellen = false;
+        WeckerMinuteEinstellen = true;
+      }
+      if (ButtonZ == HIGH) {
+        WeckerStundeEinstellen = false;
+        WeckerAuswahl == true;
+      }
+      if (ButtonPlus == HIGH) {
+        //bei der Stunde für diesen Alarm +1
+      }
+      if (ButtonMinus == HIGH) {
+        //Bei der Stunde für diesen Alarm -
+      }
+      
+    }
+    
+    if (WeckerMinuteEinstellen == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonW == HIGH) {
+        WeckerMinuteEinstellen = false;
+        WeckerTagEinstellen = true;
+      }
+      if (ButtonZ == HIGH) {
+        WeckerMinuteEinstellen = false;
+        WeckerAuswahl == true;
+      }
+      if (ButtonPlus == HIGH) {
+        //bei der Minute für diesen Alarm +1
+      }
+      if (ButtonMinus == HIGH) {
+        //Bei der Minute für diesen Alarm -
+      }
+      
+    }
+    
+    if (ManuellStundeEinstellen == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        ManuellStundeEinstellen = false;
+        ManuellMinuteEinstellen = true;
+      }
+      if (ButtonZ == HIGH) {
+        ManuellStundeEinstellen = false;
+        Normalbetrieb = true;
+      }
+      if (ButtonPlus == HIGH) {
+        //Bei der Uhrzeit in der Stunde +1
+      }
+      if (ButtonMinus == HIGH) {
+        //Bei der Uhrzeit in der Stunde -1
+      }
+    }
+    
+    if (ManuellMinuteEinstellen == true && ButtonFlag == true) {
+      ButtonFlag == false;
+      if (ButtonD == HIGH) {
+        ManuellMinuteEinstellen = false;
+        ManuellStundeEinstellen = true;
+      }
+      if (ButtonZ == HIGH) {
+        ManuellMinuteEinstellen = false;
+        Normalbetrieb = true;
+      }
+      if (ButtonPlus == HIGH) {
+        //Bei der Uhrzeit in der Minute +1
+      }
+      if (ButtonMinus == HIGH) {
+        //Bei der Uhrzeit in der Minute -1
+      }
+    }
+    
+  }
+
+
+
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  //Betrieb, wenn die Uhr im Funkuhr Modus ist zähle ich unabhängig von der Antenne die Sekunden mit
   //TCNT1 wird 1 mal mit dem Funksignal synchronisiert
-  if (FunkuhrModus == true && Timer1Flag == true) {
+  if (Funkbetrieb == true && Timer1Flag == true) {
     Timer1Flag = 0;
     SekundeVergangen ();
     UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
   }
 
-  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
   //DCF77PinFlag wird im ISR auf 1 gesetzt (MC geht hier rein, wenn sich das Signal am Antennenpin ändert)
-  if (DCF77PinFlag == true && FunkuhrModus == true) {
+  if (Funkbetrieb == true && DCF77PinFlag == true) {
     DCF77PinFlag = 0;
     DCF77Signal = digitalRead(2);
 
@@ -508,39 +695,15 @@ void loop() {
   }
 
 
+
   //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  //Wenn die Uhr nicht im FunkuhrModus ist:
-  if (FunkuhrModus == false && Timer1Flag == true) {
+  //Betrieb, wenn die Uhr nicht im FunkuhrModus ist:
+  if (Normalbetrieb == true && Timer1Flag == true) {
     Timer1Flag = 0;
     SekundeVergangen ();
     UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
   }
 
 
-  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  //zwischen Modi hin und her schalten
-  if (ButtonFlag == true) {
-    //if
-  }
-
-
-  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  //Wenn man die Uhrzeit an der Uhr manuell einstellen möchte
-  if (FunkuhrModus == false && ManuelEinstellen == true) {
-    if (StundeEinstellen == 1 && KnopfFlag == 1) {
-      UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
-      lcd.setCursor(0, 1);
-      lcd.print ("XX:--:--");
-    }
-    if (MinuteEinstellen == false && KnopfFlag == true) {
-      UhrzeitAnLCDSenden (Stunde, Minute, Sekunde);
-      lcd.setCursor(0, 1);
-      lcd.print ("--:XX:--");
-    }
-
-    //sollte man auch noch Sekunde einstellen können?
-    //Idee: wenn man in den Manuellen einstellen Modus geht: Sekunde = 0; ?
-
-  }
 
 }
