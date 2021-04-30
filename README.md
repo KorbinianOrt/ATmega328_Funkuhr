@@ -1,18 +1,20 @@
 # ATmega328_Funkuhr
-Funkuhr auf dem Arduino
+Funkwecker auf dem Arduino
 
 http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
 
 https://de.wikipedia.org/wiki/DCF77
 
-Antenne, die DCF77 in elektrisches Signal umwandelt liegt an Pin 2 an
+eine KiCad Projekt, auf der nur die Taster zum bedienen des Weckers sind
 
+eine KiCad Projekt, auf dem der Rest vom Wecker ist
 
 geplante Features:
 
--Uhr soll sowohl als Funkuhr als auch als reguläre Uhr funktionieren
+-Man soll zwischen Funkbetrieb und nicht-Funkbetrieb hin und her schalten können
 
--Uhrzeit soll man auch manuell einstellen können
+-Man soll die Uhrzeit auch manuell einstellen können
 
--Weckfunktionen
+-Man soll sich mehrere Alarme einstellen können, bei denen man Tag/Stunde/Minute und den Typ des Alarms komplett seperat voneinander einstellen kann
 
+-Als Weckfunktionen Entweder Licht oder nerviger Ton
