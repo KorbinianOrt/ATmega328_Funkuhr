@@ -86,10 +86,10 @@ bool SekundeEinstellen = false;
 bool DCF77Array [60] = {0};
 void DCF77ArrayMitschreiben () {
   DCF77Array[DCF77Bitnummer] = DCF77Bitwert;
-  
+
   Serial.print(DCF77Bitnummer);
   Serial.print(":");
-  Serial.println(DCF77Bitwert);  
+  Serial.println(DCF77Bitwert);
 }
 
 
@@ -150,11 +150,14 @@ void DCF77ArrayInterpretieren () {
 
 void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
 
+  
   if (DCF77FertigKalibriert == false) {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("warte auf Signal");
-    //Serial.println("Warte auf Signal");
+    if (FunkuhrModus == true) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("warte auf Signal");
+      }
+      
   }
   else {
     //Damit die Uhrzeit am LCD korrekt angezeigt wird muss man
@@ -175,8 +178,29 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
     lcd.print(":");
     lcd.print(SekundeZ);
     lcd.print(SekundeE);
-    //Hier noch Einfügen: Wochentag: Zahl->Buchstaben und das dann an LCD senden
-    //lcd.setCursor(9, 0);
+    lcd.print(" - ");
+
+    switch (Wochentag) {
+      case 1: lcd.print("Mo"); break;
+      case 2: lcd.print("Di"); break;
+      case 3: lcd.print("Mi"); break;
+      case 4: lcd.print("Do"); break;
+      case 5: lcd.print("Fr"); break;
+      case 6: lcd.print("Sa"); break;
+      case 7: lcd.print("So"); break;
+    }
+    //Was im FunkuhrModus angezeigt wird
+    if (FunkuhrModus == true) {
+      if (FehlerAnAntenne == true) {
+      lcd.print(" -?");
+      }
+      else {
+        lcd.print(" -#");
+      }
+    }
+    else {
+      lcd.print(" -0");
+    }
   }
 }
 
@@ -188,14 +212,31 @@ void SekundeVergangen () {
   else {
     Sekunde = 0;
     Serial.println("Minute vergangen");
+
     if (Minute < 59) {
       Minute++;
     }
     else {
-      Sekunde = 0;
       Minute = 0;
+      Sekunde = 0;
+
       if (Stunde < 23) {
         Stunde++;
+      }
+      else {
+        Stunde = 0;
+        Minute = 0;
+        Sekunde = 0;
+
+        if (Wochentag < 7) {
+          Wochentag++;
+        }
+        else {
+          Wochentag = 0;
+          Stunde = 0;
+          Minute = 0;
+          Sekunde = 0;
+        }
       }
     }
   }
@@ -227,10 +268,10 @@ void setup() {
 
 
   lcd.begin(16, 2);
-  lcd.print(" ^.^  - void");
+  lcd.print(" ^.^  - void #");
   lcd.setCursor(0, 1);
   lcd.print("o_0  - setup");
-  delay (1000);
+  delay (2000);
   lcd.clear();
 
   //16Bit Timer Register TCNT1: (für Sekunden)
@@ -381,26 +422,28 @@ void loop() {
       Timer2OverflowCounter = 0;
       TCNT2 = 0;
 
-     
+
       //Beginn einer neuen Minute
       if (DauerLow > 100) {
-        DCF77BitnummerZaehlen = true;
         DCF77ArrayInterpretieren();
         DCF77Bitnummer = 0;
-        
+
         //Wenn die Uhr hier das erste mal ankommt wird angefangen die DCF77Bitnummer mit zu zählen
         //Wenn die Uhr hier zum zweiten mal ankommt muss die letzte Minute mit korekter Bitnummer mitgezählt geworden sein -> Uhrzeit fertig kalibiriert
-        if (DCF77BitnummerZaehlen == true){
+        if (DCF77BitnummerZaehlen == true && FehlerAnAntenne == false) {
           DCF77FertigKalibriert = true;
+          TCNT0 = 0;
+          //2.mal hier
         }
-        DCF77BitnummerZaehlen = true;
-      
-
+          DCF77BitnummerZaehlen = true;
+        //1.mal hier
+        
 
 
         //Einmal in der Minute werden die Werte aus DCF77Interpretieren auf Minute, Stunde, Wochentag übertragen
         //So kann man verhindern, dass Wochentag, Stunde oder Minute Werte annimmt, die eigentlich gar nicht möglich sind. (z.b. 32:74)
         //Minute überprüfen
+        FehlerAnAntenne = FehlerBitnummer0 || FehlerBitnummer20 || FehlerParitaetStunde || FehlerParitaetStunde || FehlerParitaetDatum || FehlerDCF77HighDauer || FehlerDCF77LowDauer;
         if (FehlerAnAntenne == false) {
           Sekunde = 1;
         }
@@ -415,6 +458,10 @@ void loop() {
         if (WochentagDCF77 < 7 && FehlerAnAntenne == false) {
           Wochentag = WochentagDCF77;
         }
+        //FehlerDCF77HighDauer bzw FehlerDCF77LowDauer wird bei jeder Flanke von HIGH auf LOW an PIN2 überprüft, kann da aber nur auf true gesetzt werden. Wenn FehlerDauerDCF77Signal == true würde es nirgendwo auf false gesetzt werden, falls dieser Fehler nicht existiert. Deswegen wird das einmal am Ende der Minute gemacht.
+        FehlerDCF77HighDauer = false;
+        FehlerDCF77LowDauer = false;
+
 
         Serial.println ("----- Beginn neuer Minute hier -----");
         Serial.print(Stunde);
@@ -423,9 +470,6 @@ void loop() {
         Serial.print("FehlerAnAntenne:");
         Serial.println(FehlerAnAntenne);
 
-        //FehlerDauerDCF77Signal wird bei jeder Flanke von HIGH auf LOW an PIN2 überprüft. Kann da aber nur auf true gesetzt werden. Wenn FehlerDauerDCF77Signal == true würde es nirgendwo auf false gesetzt werden, falls dieser Fehler nicht existiert. Deswegen wird das einmal am Ende der Minute gemacht.
-        FehlerDCF77HighDauer = false;
-        FehlerDCF77LowDauer = false;
       }
     }
 
@@ -438,7 +482,7 @@ void loop() {
       //Serial.println(DauerHigh);
       Timer2OverflowCounter = 0;
       TCNT2 = 0;
-      
+
       if (DauerHigh > 9) {
         DCF77Bitwert = 1;
       }
@@ -449,7 +493,7 @@ void loop() {
       if (DCF77BitnummerZaehlen == true) {
         DCF77Bitnummer++;
       }
-            
+
       if (DauerHigh < 5) {
         FehlerDCF77HighDauer = true;
         Serial.println("jetzt Fehler High Dauer zu kurz!!");
@@ -461,10 +505,6 @@ void loop() {
         FehlerAnAntenne = FehlerBitnummer0 || FehlerBitnummer20 || FehlerParitaetStunde || FehlerParitaetStunde || FehlerParitaetDatum || FehlerDCF77HighDauer || FehlerDCF77LowDauer;
       }
     }
-
-
-
-
   }
 
 
