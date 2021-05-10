@@ -171,13 +171,9 @@ F 3 "" H 3450 3250 50  0001 C CNN
 $EndComp
 Connection ~ 6050 3250
 Wire Wire Line
-	6650 3250 6050 3250
-Wire Wire Line
 	6650 3100 6650 3250
 Connection ~ 6350 2550
 Connection ~ 6650 3250
-Wire Wire Line
-	7250 3250 6650 3250
 Wire Wire Line
 	7250 3100 7250 3250
 Wire Wire Line
@@ -269,39 +265,6 @@ F 3 "~" H 5550 3600 50  0001 C CNN
 	-1   0    0    1   
 $EndComp
 $Comp
-L pspice:DIODE DG4
-U 1 1 608BDD89
-P 6150 3600
-F 0 "DG4" H 6150 3335 50  0000 C CNN
-F 1 "DIODE" H 6150 3426 50  0000 C CNN
-F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 6150 3600 50  0001 C CNN
-F 3 "~" H 6150 3600 50  0001 C CNN
-	1    6150 3600
-	-1   0    0    1   
-$EndComp
-$Comp
-L pspice:DIODE DG5
-U 1 1 608BF1AA
-P 6750 3600
-F 0 "DG5" H 6750 3335 50  0000 C CNN
-F 1 "DIODE" H 6750 3426 50  0000 C CNN
-F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 6750 3600 50  0001 C CNN
-F 3 "~" H 6750 3600 50  0001 C CNN
-	1    6750 3600
-	-1   0    0    1   
-$EndComp
-$Comp
-L pspice:DIODE DG6
-U 1 1 608C21A3
-P 7350 3600
-F 0 "DG6" H 7350 3335 50  0000 C CNN
-F 1 "DIODE" H 7350 3426 50  0000 C CNN
-F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 7350 3600 50  0001 C CNN
-F 3 "~" H 7350 3600 50  0001 C CNN
-	1    7350 3600
-	-1   0    0    1   
-$EndComp
-$Comp
 L Connector:Conn_01x09_Male J1
 U 1 1 608C799A
 P 4650 5700
@@ -313,11 +276,7 @@ F 3 "~" H 4650 5700 50  0001 C CNN
 	0    -1   -1   0   
 $EndComp
 Connection ~ 6550 3750
-Wire Wire Line
-	6550 3750 7150 3750
 Connection ~ 5950 3750
-Wire Wire Line
-	5950 3750 6550 3750
 Connection ~ 5350 3750
 Wire Wire Line
 	5350 3750 5950 3750
@@ -328,10 +287,6 @@ Wire Wire Line
 	4750 3750 5350 3750
 Wire Wire Line
 	4150 3750 4750 3750
-Wire Wire Line
-	7150 3750 7150 3600
-Wire Wire Line
-	6550 3600 6550 3750
 Wire Wire Line
 	5950 3600 5950 3750
 Wire Wire Line
@@ -513,24 +468,6 @@ Wire Wire Line
 	5750 3600 5750 3900
 Connection ~ 5750 3600
 Wire Wire Line
-	6350 3100 6350 3600
-Connection ~ 6350 3100
-Wire Wire Line
-	6350 3600 6350 3900
-Connection ~ 6350 3600
-Wire Wire Line
-	6950 3100 6950 3600
-Connection ~ 6950 3100
-Wire Wire Line
-	6950 3600 6950 3900
-Connection ~ 6950 3600
-Wire Wire Line
-	7550 3100 7550 3600
-Connection ~ 7550 3100
-Wire Wire Line
-	7550 3600 7550 3900
-Connection ~ 7550 3600
-Wire Wire Line
 	4550 4600 4550 5500
 Wire Wire Line
 	4650 4750 5150 4750
@@ -589,4 +526,67 @@ Wire Wire Line
 Connection ~ 3750 3250
 Wire Wire Line
 	3750 3250 3450 3250
+Connection ~ 7550 3100
+Connection ~ 6950 3100
+Connection ~ 6350 3100
+Wire Wire Line
+	7250 3250 6650 3250
+Wire Wire Line
+	6650 3250 6050 3250
+Wire Wire Line
+	6550 3750 7150 3750
+Wire Wire Line
+	5950 3750 6550 3750
+Connection ~ 7550 3600
+Wire Wire Line
+	7550 3600 7550 3900
+Wire Wire Line
+	7550 3100 7550 3600
+Connection ~ 6950 3600
+Wire Wire Line
+	6950 3600 6950 3900
+Wire Wire Line
+	6950 3100 6950 3600
+Connection ~ 6350 3600
+Wire Wire Line
+	6350 3600 6350 3900
+Wire Wire Line
+	6350 3100 6350 3600
+Wire Wire Line
+	6550 3600 6550 3750
+Wire Wire Line
+	7150 3750 7150 3600
+$Comp
+L pspice:DIODE DG6
+U 1 1 608C21A3
+P 7350 3600
+F 0 "DG6" H 7350 3335 50  0000 C CNN
+F 1 "DIODE" H 7350 3426 50  0000 C CNN
+F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 7350 3600 50  0001 C CNN
+F 3 "~" H 7350 3600 50  0001 C CNN
+	1    7350 3600
+	-1   0    0    1   
+$EndComp
+$Comp
+L pspice:DIODE DG5
+U 1 1 608BF1AA
+P 6750 3600
+F 0 "DG5" H 6750 3335 50  0000 C CNN
+F 1 "DIODE" H 6750 3426 50  0000 C CNN
+F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 6750 3600 50  0001 C CNN
+F 3 "~" H 6750 3600 50  0001 C CNN
+	1    6750 3600
+	-1   0    0    1   
+$EndComp
+$Comp
+L pspice:DIODE DG4
+U 1 1 608BDD89
+P 6150 3600
+F 0 "DG4" H 6150 3335 50  0000 C CNN
+F 1 "DIODE" H 6150 3426 50  0000 C CNN
+F 2 "Diode_THT:D_A-405_P7.62mm_Horizontal" H 6150 3600 50  0001 C CNN
+F 3 "~" H 6150 3600 50  0001 C CNN
+	1    6150 3600
+	-1   0    0    1   
+$EndComp
 $EndSCHEMATC
