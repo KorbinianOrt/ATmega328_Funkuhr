@@ -59,6 +59,35 @@ bool WeckerStundeEinstellen = false;
 bool WeckerMinuteEinstellen = false;
 
 
+//um mit den 6 Buttons zwischen 
+enum class Betriebsart {
+  Funkbetrieb,
+  Normalbetrieb,
+  Weckerauswahl,
+  NeuerAlarm,
+  WeckerTagEinstellen,
+  WeckerStundeEinstellen,
+  WeckerMinuteEinstellen,
+  ManuellStundeEinstellen,
+  ManuellMinuteEinstellen
+};
+Betriebsart aktuelleBetriebsart = Betriebsart::Normalbetrieb;
+
+
+//eigentlich ist geplant, dass man beliebig viele Alarme einstellen kann
+//wie ztum fick soll ich das denn machen????
+//Bis ich das checke gibt's nur 3 Alarme
+//Die Alarme brauchen ihre eigenen Attribute:
+//Weckmethode?, An/aus?, AnWelchemTag aktiviert?, zu welcher Uhrzeit?
+enum class Alarm {
+  Alarm1,
+  Alarm2,
+  Alarm3,
+};
+Alarm aktuellerAlarm = Alarm::Alarm1;
+
+
+
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Alle Funktionen hier:
 
@@ -130,14 +159,14 @@ void DCF77ArrayInterpretieren () {
 
 void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
 
-  
+
   if (DCF77FertigKalibriert == false) {
     if (Funkbetrieb == true) {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("warte auf Signal");
-      }
-      
+    }
+
   }
   else {
     //Damit die Uhrzeit am LCD korrekt angezeigt wird muss man
@@ -172,7 +201,7 @@ void UhrzeitAnLCDSenden (int StundeLCD, int MinuteLCD, int SekundeLCD) {
     //Was im FunkuhrModus angezeigt wird
     if (Funkbetrieb == true) {
       if (FehlerAnAntenne == true) {
-      lcd.print(" -?");
+        lcd.print(" -?");
       }
       else {
         lcd.print(" -#");
@@ -231,31 +260,31 @@ int const ButtonZ = A2;
 int const ButtonPlus = A3;
 int const ButtonMinus = A4;
 int const ButtonLicht = A5;
-void InputPinsLesen(){
+void InputPinsLesen() {
   digitalRead(ButtonD);
   digitalRead(ButtonW);
   digitalRead(ButtonZ);
   digitalRead(ButtonPlus);
   digitalRead(ButtonMinus);
   digitalRead(ButtonLicht);
-  if (ButtonD == HIGH){
-      Serial.println("ButtonD gedrückt");
-    }
-    if (ButtonW == HIGH){
-      Serial.println("ButtonW gedrückt");
-    }
-    if (ButtonZ == HIGH){
-      Serial.println("ButtonZ gedrückt");
-    }
-    if (ButtonPlus == HIGH){
-      Serial.println("ButtonPlus gedrückt");
-    }
-    if (ButtonMinus == HIGH){
-      Serial.println("ButtonMinus gedrückt");
-    }
-    if (ButtonLicht == HIGH){
-      Serial.println("ButtonLicht gedrückt");
-    }
+  if (digitalRead(ButtonD) == HIGH) {
+    Serial.println("ButtonD gedrückt");
+  }
+  if (digitalRead(ButtonW) == HIGH) {
+    Serial.println("ButtonW gedrückt");
+  }
+  if (digitalRead(ButtonZ) == HIGH) {
+    Serial.println("ButtonZ gedrückt");
+  }
+  if (digitalRead(ButtonPlus) == HIGH) {
+    Serial.println("ButtonPlus gedrückt");
+  }
+  if (digitalRead(ButtonMinus) == HIGH) {
+    Serial.println("ButtonMinus gedrückt");
+  }
+  if (digitalRead(ButtonLicht) == HIGH) {
+    Serial.println("ButtonLicht gedrückt");
+  }
 }
 
 
@@ -270,7 +299,7 @@ void setup() {
   //Pin2 = Pin für die Antenne
   int const Antenne = 2;
   pinMode(Antenne, INPUT);
-  
+
   //A0 bis A5 sind die Buttons, mit denen der Wecker bedient wird
   pinMode(ButtonD, INPUT);
   pinMode(ButtonW, INPUT);
@@ -278,9 +307,9 @@ void setup() {
   pinMode(ButtonPlus, INPUT);
   pinMode(ButtonMinus, INPUT);
   pinMode(ButtonLicht, INPUT);
-  
 
-  
+
+
 
   //I-Bit wird gesetzt -> Interrupts sind global aktiviert (S. 15)
   sei();
@@ -302,45 +331,6 @@ void setup() {
   lcd.clear();
 
   //16Bit Timer Register TCNT1: (für Sekunden)
-  /* Erklärung zum 16 Bit Timer:
-     Ich möchte in das 16 Bit TCNT1 Register zählen, um so 1 mal pro Sekunde einen interrupt triggern zu können (16-bit Timer/Counter1) siehe s. 89
-
-     Ich möchte "Normal Mode" (siehe s.100)
-     Hier wird ins TCNT1 16 bit Reigster gezählt. Wenn es voll ist wird TOV1 = 1 und TCNT1 = 0 gesetzt.
-     Man kann Startwerte für TCNT1 angeben.
-     WGM13 = 0
-     WGM12 = 0
-     WGM11 = 0
-     WGM10 = 0
-     siehe Tabelle s. 108
-
-     Taktfrequenz = 16Mhz
-     256 prescaler: -> Frequenz wird reduziert auf
-     16Mhz/256 = 62500 Hz
-     so wird in TCNT1 nur noch mit 62500 Hz gezählt
-     (ist ca alle 1.048576 Sek voll)
-     CS12 = 1
-     CS11 = 0
-     CS10 = 0
-     siehe Tabelle S. 110
-
-     Wenn das 16bit Counter Register (TCNT1) voll ist soll ein Interrupt getriggert werden
-     im "Timer/Counter1 Interrupt Mask Register" (TISMK1) muss das "Timer/Counter1 Overflow Interrupt Enable" bit (TOIE1) gesetzt werden
-     siehe S.112
-     Im "Timer/Counter1 Interrupt Flag Register" (TIFR1) wird das "Timer Overflow Vector1" (TOV1) Bit bei einem Overflow von TCNT1 jetzt automatisch gesetzt.
-     TOV1 wird automatisch gelöscht, wenn der Overflow Interrupt Vector ausgeführt wurde.
-     siehe S.113
-
-     Damit der Timer in 1 - Sekunden abständen ein Interrupt setzt (und nicht in 1.048576 Sek. Abständen) muss man bei TCNT1 einen Startwert setzen
-     TCNT1 = 65536 - ( (Fclk) / (Prescaler*Ftarget) )
-     Dieser Startwert muss jedes mal neu gesetzt werden, wenn TCNT1 überläuft
-
-     Alle diese Bits befinden sich in den Registern:
-     TCCR1A
-     TCCR1B
-     TIMSK1
-     (TIFR1)
-  */
   //Diese Werte müssen die Register haben: (siehe Seite 108 ff)
   TCCR1A = 0b00000000;
   TCCR1B = 0b00000100;
@@ -349,45 +339,11 @@ void setup() {
   TCNT1 = 3036;
 
   //8Bit Timer Register TCNT2: (für Zeit zischen Änderungen am Antennenpin)
-  /*Erklärung zum 8 Bit Timer:
-    Ich möchte Normal Mode verwenden (siehe Seite 116ff)
-    WGM22 = 0
-    WGM21 = 0
-    WGM20 = 0
-    "In normal operation the TimerOverflowFlag (TOV2) will be set in the same timer clock cycle as the TCNT2 becomes 0"
-
-    Prescaler: (siehe Seite 131ff)
-    mit einem 1024 prescaler hat das 8 bit Register 61 mal in der Sekunde einen Overflow
-    CS22 = 1
-    CS21 = 1
-    CS20 = 1
-    6.1 mal für 0.1 Sek (logische 0)
-    12.2 mal für 0.2 Sek (logische 1)
-    109.8 oder 115.9 mal für Pause zwischen BitNummer 58 und 0
-
-    Ich brauche eine Variable, in der +1 gerechnet wird, jedes mal, wenn TCNT2 einen Overflow hat
-
-    Wenn das 8bit Counter Register (TCNT2) voll ist soll ein Interrupt getriggert werden
-    im "Timer/Counter2 Interrupt Mask Register" (TISMK2) muss das "Timer/Counter2 Overflow Interrupt Enable" bit (TOIE2) gesetzt werden
-    siehe S.88
-    Im "Timer/Counter2 Interrupt Flag Register" (TIFR2) wird das "Timer Overflow Vector0" (TOV2) Bit bei einem Overflow von TCNT2 jetzt automatisch gesetzt.
-    TOV2 wird automatisch gelöscht, wenn der Overflow Interrupt Vector ausgeführt wurde.
-    siehe S.88
-
-    kein allgemeiner Startwert für TCNT2, aber jedes mal, wenn logische 0, logische 1, oder Pause zwischen Bit58 und Bit0 entdeckt wurde sollte man zurücksetzen.
-
-    alle hierfür verwendeten Bits sind in den Registern:
-    TCCR2A
-    TCCR0B
-    TIMSK2
-    TIFR2
-  */
   //Diese Werte müssen die Register haben: (siehe Seite 127ff)
   TCCR2A = 0b00000000;
   TCCR2B = 0b00000111;
   TIMSK2 = 0b00000001;
   TCNT2 = 0;
-
 }
 
 
@@ -429,158 +385,70 @@ void loop() {
   //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   //zwischen Modi hin und her schalten und Uhrzeit und Wecker einstellen
   //Die 8 Status sind global definiert
-  if (ButtonFlag == true) {
-    InputPinsLesen();
 
-    if (Funkbetrieb == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        Funkbetrieb == false;
-        ManuellStundeEinstellen == true;
-      }
-      if (ButtonW == HIGH){
-        Funkbetrieb == false;
-        WeckerAuswahl == true;
-      }
-      if (ButtonPlus == HIGH){
-        Funkbetrieb == false;
-        Normalbetrieb == true;
-      }
-    }
-    
-    if (Normalbetrieb == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        Normalbetrieb == false;
-        ManuellStundeEinstellen = true;
-      }
-      if (ButtonW == HIGH) {
-        Normalbetrieb == false;
-        WeckerAuswahl == true;
-      }
-      if (ButtonPlus == true) {
-        Normalbetrieb == false;
-        Funkbetrieb == true;
-      }
-      
-    }
-    
-    if (WeckerAuswahl == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        //nächster Alarm, 0,1,2,3,...,neu
-      }
-      if (ButtonW == HIGH) {
-        //AlarmModus für diesen Alarm umschalten
-      }
-      if (ButtonZ == HIGH) {
-        WeckerAuswahl == false;
-        Normalbetrieb == true;
-      }
-      if (ButtonPlus == HIGH) {
-        WeckerAuswahl == false;
-        WeckerTagEinstellen = true;
-      }
-      if (ButtonMinus == HIGH) {
-        //Den ausgewählten Alarm löschen
-      }
-    }
 
-    if (WeckerTagEinstellen == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        //nächsten Tag auswählen
-      }
-      if (ButtonW == HIGH) {
-        WeckerTagEinstellen = false;
-        WeckerStundeEinstellen = true;
-      }
-      if (ButtonZ == HIGH) {
-        WeckerTagEinstellen = false;
-        WeckerAuswahl == true;
-      }
-      if (ButtonPlus == HIGH) {
-        //Wecker für diesen Tag aktivieren
-      }
-      if (ButtonMinus == HIGH) {
-        //Wecker für diesen Tag deaktivieren
-      }
+
+
+  if (ButtonFlag) {
+    switch (aktuelleBetriebsart) {
+      case Betriebsart::Funkbetrieb :
+        if (digitalRead(ButtonD) == HIGH)
+          aktuelleBetriebsart = Betriebsart::ManuellStundeEinstellen;
+        else if (digitalRead(ButtonW) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Weckerauswahl;
+        else if (digitalRead(ButtonPlus) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Normalbetrieb;
+        break;
+        
+      case Betriebsart::Normalbetrieb :
+        if (digitalRead(ButtonW) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Weckerauswahl;
+        else if (digitalRead(ButtonD) == HIGH)
+          aktuelleBetriebsart = Betriebsart::ManuellStundeEinstellen;
+        else if (digitalRead(ButtonPlus) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Funkbetrieb;
+        break;
+
+      case Betriebsart::Weckerauswahl :
+        if (digitalRead(ButtonZ) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Normalbetrieb;
+        else if (digitalRead(ButtonMinus) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Weckerauswahl;
+          //aktuell ausgewählten Wecker löschen/deaktivieren
+        else if (digitalRead(ButtonW) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Weckerauswahl;
+          //durchschalten zwischen WeckerAus, WeckerLicht, WeckerTon, WeckerTon & WeckerLicht
+        else if (digitalRead(ButtonD) == HIGH)
+          aktuelleBetriebsart = Betriebsart::Weckerauswahl;
+          //durchschalten zwischen den einzelnen Alarmen (Alarm1 bis AlarmN, nach AlarmN: NeuerAlarm? Das dann mit + bestätigen
+          //NeuerAlarm ist eigentlich hierfür gedacht
+        else if (digitalRead(ButtonPlus) == HIGH)
+          aktuelleBetriebsart = Betriebsart::WeckerTagEinstellen;
+        break;
+
+      case Betriebsart::WeckerTagEinstellen :
+
+        break;
+
+      case Betriebsart::WeckerStundeEinstellen :
+
+        break;
+
+      case Betriebsart::WeckerMinuteEinstellen :
+
+        break;
+
+      case Betriebsart::ManuellStundeEinstellen :
+
+        break;
+
+      case Betriebsart::ManuellMinuteEinstellen :
+
+        break;
+
+      default:
+        break;
     }
-    
-    if (WeckerStundeEinstellen == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonW == HIGH) {
-        WeckerStundeEinstellen = false;
-        WeckerMinuteEinstellen = true;
-      }
-      if (ButtonZ == HIGH) {
-        WeckerStundeEinstellen = false;
-        WeckerAuswahl == true;
-      }
-      if (ButtonPlus == HIGH) {
-        //bei der Stunde für diesen Alarm +1
-      }
-      if (ButtonMinus == HIGH) {
-        //Bei der Stunde für diesen Alarm -
-      }
-      
-    }
-    
-    if (WeckerMinuteEinstellen == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonW == HIGH) {
-        WeckerMinuteEinstellen = false;
-        WeckerTagEinstellen = true;
-      }
-      if (ButtonZ == HIGH) {
-        WeckerMinuteEinstellen = false;
-        WeckerAuswahl == true;
-      }
-      if (ButtonPlus == HIGH) {
-        //bei der Minute für diesen Alarm +1
-      }
-      if (ButtonMinus == HIGH) {
-        //Bei der Minute für diesen Alarm -
-      }
-      
-    }
-    
-    if (ManuellStundeEinstellen == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        ManuellStundeEinstellen = false;
-        ManuellMinuteEinstellen = true;
-      }
-      if (ButtonZ == HIGH) {
-        ManuellStundeEinstellen = false;
-        Normalbetrieb = true;
-      }
-      if (ButtonPlus == HIGH) {
-        //Bei der Uhrzeit in der Stunde +1
-      }
-      if (ButtonMinus == HIGH) {
-        //Bei der Uhrzeit in der Stunde -1
-      }
-    }
-    
-    if (ManuellMinuteEinstellen == true && ButtonFlag == true) {
-      ButtonFlag == false;
-      if (ButtonD == HIGH) {
-        ManuellMinuteEinstellen = false;
-        ManuellStundeEinstellen = true;
-      }
-      if (ButtonZ == HIGH) {
-        ManuellMinuteEinstellen = false;
-        Normalbetrieb = true;
-      }
-      if (ButtonPlus == HIGH) {
-        //Bei der Uhrzeit in der Minute +1
-      }
-      if (ButtonMinus == HIGH) {
-        //Bei der Uhrzeit in der Minute -1
-      }
-    }
-    
   }
 
 
@@ -622,9 +490,9 @@ void loop() {
           TCNT0 = 0;
           //2.mal hier
         }
-          DCF77BitnummerZaehlen = true;
+        DCF77BitnummerZaehlen = true;
         //1.mal hier
-        
+
 
 
         //Einmal in der Minute werden die Werte aus DCF77Interpretieren auf Minute, Stunde, Wochentag übertragen
