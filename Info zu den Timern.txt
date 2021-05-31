@@ -1,0 +1,88 @@
+  //16Bit Timer Register TCNT1: (für Sekunden)
+  /* Erklärung zum 16 Bit Timer:
+     Ich möchte in das 16 Bit TCNT1 Register zählen, um so 1 mal pro Sekunde einen interrupt triggern zu können (16-bit Timer/Counter1) siehe s. 89
+
+     Ich möchte "Normal Mode" (siehe s.100)
+     Hier wird ins TCNT1 16 bit Reigster gezählt. Wenn es voll ist wird TOV1 = 1 und TCNT1 = 0 gesetzt.
+     Man kann Startwerte für TCNT1 angeben.
+     WGM13 = 0
+     WGM12 = 0
+     WGM11 = 0
+     WGM10 = 0
+     siehe Tabelle s. 108
+
+     Taktfrequenz = 16Mhz
+     256 prescaler: -> Frequenz wird reduziert auf
+     16Mhz/256 = 62500 Hz
+     so wird in TCNT1 nur noch mit 62500 Hz gezählt
+     (ist ca alle 1.048576 Sek voll)
+     CS12 = 1
+     CS11 = 0
+     CS10 = 0
+     siehe Tabelle S. 110
+
+     Wenn das 16bit Counter Register (TCNT1) voll ist soll ein Interrupt getriggert werden
+     im "Timer/Counter1 Interrupt Mask Register" (TISMK1) muss das "Timer/Counter1 Overflow Interrupt Enable" bit (TOIE1) gesetzt werden
+     siehe S.112
+     Im "Timer/Counter1 Interrupt Flag Register" (TIFR1) wird das "Timer Overflow Vector1" (TOV1) Bit bei einem Overflow von TCNT1 jetzt automatisch gesetzt.
+     TOV1 wird automatisch gelöscht, wenn der Overflow Interrupt Vector ausgeführt wurde.
+     siehe S.113
+
+     Damit der Timer in 1 - Sekunden abständen ein Interrupt setzt (und nicht in 1.048576 Sek. Abständen) muss man bei TCNT1 einen Startwert setzen
+     TCNT1 = 65536 - ( (Fclk) / (Prescaler*Ftarget) )
+     Dieser Startwert muss jedes mal neu gesetzt werden, wenn TCNT1 überläuft
+
+     Alle diese Bits befinden sich in den Registern:
+     TCCR1A
+     TCCR1B
+     TIMSK1
+     (TIFR1)
+  */
+  //Diese Werte müssen die Register haben: (siehe Seite 108 ff)
+  TCCR1A = 0b00000000;
+  TCCR1B = 0b00000100;
+  TIMSK1 = 0b00000001;
+  //TCNT1 Startwert:
+  TCNT1 = 3036;
+
+  //8Bit Timer Register TCNT2: (für Zeit zischen Änderungen am Antennenpin)
+  /*Erklärung zum 8 Bit Timer:
+    Ich möchte Normal Mode verwenden (siehe Seite 116ff)
+    WGM22 = 0
+    WGM21 = 0
+    WGM20 = 0
+    "In normal operation the TimerOverflowFlag (TOV2) will be set in the same timer clock cycle as the TCNT2 becomes 0"
+
+    Prescaler: (siehe Seite 131ff)
+    mit einem 1024 prescaler hat das 8 bit Register 61 mal in der Sekunde einen Overflow
+    CS22 = 1
+    CS21 = 1
+    CS20 = 1
+    6.1 mal für 0.1 Sek (logische 0)
+    12.2 mal für 0.2 Sek (logische 1)
+    109.8 oder 115.9 mal für Pause zwischen BitNummer 58 und 0
+
+    Ich brauche eine Variable, in der +1 gerechnet wird, jedes mal, wenn TCNT2 einen Overflow hat
+
+    Wenn das 8bit Counter Register (TCNT2) voll ist soll ein Interrupt getriggert werden
+    im "Timer/Counter2 Interrupt Mask Register" (TISMK2) muss das "Timer/Counter2 Overflow Interrupt Enable" bit (TOIE2) gesetzt werden
+    siehe S.88
+    Im "Timer/Counter2 Interrupt Flag Register" (TIFR2) wird das "Timer Overflow Vector0" (TOV2) Bit bei einem Overflow von TCNT2 jetzt automatisch gesetzt.
+    TOV2 wird automatisch gelöscht, wenn der Overflow Interrupt Vector ausgeführt wurde.
+    siehe S.88
+
+    kein allgemeiner Startwert für TCNT2, aber jedes mal, wenn logische 0, logische 1, oder Pause zwischen Bit58 und Bit0 entdeckt wurde sollte man zurücksetzen.
+
+    alle hierfür verwendeten Bits sind in den Registern:
+    TCCR2A
+    TCCR0B
+    TIMSK2
+    TIFR2
+  */
+  //Diese Werte müssen die Register haben: (siehe Seite 127ff)
+  TCCR2A = 0b00000000;
+  TCCR2B = 0b00000111;
+  TIMSK2 = 0b00000001;
+  TCNT2 = 0;
+
+Ich habe die Erklärung, welche Bits in welchen Registern man wie setzen muss aus dem Code gelöscht. War mir zu unübersichtlich die ganze Zeit an 10000 Zeilen Kommentar vorbei zu scrollen.
