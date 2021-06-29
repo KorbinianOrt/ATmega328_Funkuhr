@@ -79,12 +79,27 @@ Betriebsart aktuelleBetriebsart = Betriebsart::Normalbetrieb;
 //Bis ich das checke gibt's nur 3 Alarme
 //Die Alarme brauchen ihre eigenen Attribute:
 //Weckmethode?, An/aus?, AnWelchemTag aktiviert?, zu welcher Uhrzeit?
-enum class Alarm {
-  Alarm1,
-  Alarm2,
-  Alarm3,
+class KlasseAlarm{
+  public:
+  bool Aktiv;
+  bool Licht;
+  bool Ton;
+  
+  bool Montag;
+  bool Dienstag;
+  bool Mittwoch;
+  bool Donnerstag;
+  bool Freitag;
+  bool Samstag;
+  bool Sonntag;
+  
+  int Stunde;
+  int Minute;
 };
-Alarm aktuellerAlarm = Alarm::Alarm1;
+
+KlasseAlarm ObjektAlarm [50];
+//beispiel:
+//ObjektAlarm[nummer].Montag=true;
 
 
 
@@ -388,8 +403,10 @@ void loop() {
 
 
 
-
+  //nur gedacht, um zwischen den einzelnen Status hin und her zu wechseln
   if (ButtonFlag) {
+    
+
     switch (aktuelleBetriebsart) {
       case Betriebsart::Funkbetrieb :
         if (digitalRead(ButtonD) == HIGH)
